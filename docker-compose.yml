@@ -1,0 +1,11 @@
+services:
+  resume-builder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NGINX_IMAGE: ${NGINX_IMAGE:-nginx:alpine}
+    ports:
+      - "3000:80"
+    restart: unless-stopped
+    container_name: resume-builder
