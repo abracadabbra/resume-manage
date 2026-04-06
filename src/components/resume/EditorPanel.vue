@@ -152,6 +152,9 @@ const completionPercent = computed(() => {
 
 function handleSave() {
   store.saveToStorage()
+  if (store.isLoggedIn && store.currentResumeId) {
+    store.saveToCloud()
+  }
   showSaved.value = true
   setTimeout(() => {
     showSaved.value = false

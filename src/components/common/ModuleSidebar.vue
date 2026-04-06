@@ -1,4 +1,9 @@
 ﻿<script setup lang="ts">
+import { useResumeStore } from '@/stores/resume'
+import { ref } from 'vue'
+import LoginDialog from './LoginDialog.vue'
+import VersionManager from './VersionManager.vue'
+
 const props = withDefaults(
   defineProps<{
     collapsed?: boolean
@@ -15,6 +20,10 @@ const emit = defineEmits<{
   (e: 'select-menu', key: 'resume-editor' | 'ai-interviewer'): void
 }>()
 
+const store = useResumeStore()
+const showLoginDialog = ref(false)
+const showVersionDialog = ref(false)
+
 const primaryMenus = [
   {
     key: 'resume-editor' as const,
@@ -29,6 +38,10 @@ const primaryMenus = [
       'M9 3h6M12 3v3m-6 4h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-3l-3 2-3-2H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Zm3 3h.01M15 15h.01',
   },
 ]
+
+function handleLogout() {
+  store.logout()
+}
 </script>
 
 <template>
@@ -73,7 +86,43 @@ const primaryMenus = [
         </button>
       </li>
     </ul>
+
+    <div class="cloud-sync-section">
+      <template v-if="store.isLoggedIn">
+        <button 
+          class="cloud-btn"
+          @click="showVersionDialog = true"
+        >
+          <span class="cloud-icon">☁️</span>
+          <span class="cloud-label">版本管理</span>
+        </button>
+        <button 
+          class="logout-btn"
+          @click="handleLogout"
+        >
+          退出登录
+        </button>
+      </template>
+      <template v-else>
+        <button 
+          class="cloud-btn login-btn"
+          @click="showLoginDialog = true"
+        >
+          <span class="cloud-icon">☁️</span>
+          <span class="cloud-label">登录同步</span>
+        </button>
+      </template>
+    </div>
   </aside>
+
+  <LoginDialog 
+    v-if="showLoginDialog" 
+    @close="showLoginDialog = false" 
+  />
+  <VersionManager 
+    v-if="showVersionDialog" 
+    @close="showVersionDialog = false" 
+  />
 </template>
 
 <style scoped>
@@ -292,5 +341,62 @@ const primaryMenus = [
 .sidebar.collapsed .menu-icon {
   width: 28px;
   height: 28px;
+}
+
+.cloud-sync-section {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid #e0d2c1;
+}
+
+.cloud-btn {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid #e0d2c1;
+  border-radius: 8px;
+  background: #fff;
+  color: #2d2521;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.cloud-btn:hover {
+  border-color: #2a5caa;
+  background: #f0f5ff;
+}
+
+.login-btn {
+  background: #2a5caa;
+  color: #fff;
+  border-color: #2a5caa;
+}
+
+.login-btn:hover {
+  background: #1e4a8a;
+}
+
+.cloud-icon {
+  font-size: 16px;
+}
+
+.logout-btn {
+  padding: 8px 12px;
+  border: none;
+  background: none;
+  color: #7b6a5b;
+  font-size: 12px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.logout-btn:hover {
+  color: #dc3545;
 }
 </style>

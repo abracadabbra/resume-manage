@@ -1,6 +1,19 @@
 import { defineStore } from 'pinia'
 import { reactive, ref, watch } from 'vue'
 import { normalizeResumeTemplateKey, type ResumeTemplateKey } from '@/templates/resume'
+import { 
+  signUp, 
+  signIn, 
+  signOut, 
+  getSession, 
+  getResumes, 
+  getActiveResume, 
+  createResume, 
+  updateResume, 
+  setActiveResume, 
+  deleteResume,
+  type ResumeRecord 
+} from '@/services/supabase'
 
 export interface BasicInfo {
   name: string
@@ -331,6 +344,156 @@ export const useResumeStore = defineStore('resume', () => {
   const AUTO_SAVE_DELAY_MS = 500
   const SAVE_LOADING_MIN_MS = 900
 
+  const isLoggedIn = ref(false)
+  const userId = ref<string | null>(null)
+  const currentResumeId = ref<string | null>(null)
+  const resumeVersions = ref<ResumeRecord[]>([])
+
+  async function login(email: string, password: string) {
+    const { data, error } = await signIn(email, password)
+    if (error) throw error
+    if (data?.user) {
+      userId.value = data.user.id
+      isLoggedIn.value = true
+      await loadResumes()
+    }
+  }
+
+  async function register(email: string, password: string) {
+    const { data, error } = await signUp(email, password)
+    if (error) throw error
+    if (data?.user) {
+      userId.value = data.user.id
+      isLoggedIn.value = true
+    }
+  }
+
+  async function logout() {
+    await signOut()
+    userId.value = null
+    isLoggedIn.value = false
+    currentResumeId.value = null
+    resumeVersions.value = []
+  }
+
+  async function loadResumes() {
+    if (!userId.value) return
+    resumeVersions.value = await getResumes(userId.value)
+    const active = await getActiveResume(userId.value)
+    if (active) {
+      currentResumeId.value = active.id
+      loadData(active.data)
+    }
+  }
+
+  async function saveToCloud(name?: string) {
+    if (!userId.value) {
+      throw new Error('Not logged in')
+    }
+    const data = getData()
+    if (currentResumeId.value) {
+      await updateResume(currentResumeId.value, data)
+    } else if (name) {
+      const resume = await createResume(userId.value, name, data)
+      currentResumeId.value = resume.id
+    }
+    await loadResumes()
+  }
+
+  async function createNewVersion(name: string) {
+    if (!userId.value) {
+      throw new Error('Not logged in')
+    }
+    const data = getData()
+    const resume = await createResume(userId.value, name, data)
+    currentResumeId.value = resume.id
+    await loadResumes()
+  }
+
+  async function switchVersion(resumeId: string) {
+    if (!userId.value) return
+    await setActiveResume(userId.value, resumeId)
+    currentResumeId.value = resumeId
+    await loadResumes()
+  }
+
+  async function removeVersion(resumeId: string) {
+    await deleteResume(resumeId)
+    if (currentResumeId.value === resumeId) {
+      currentResumeId.value = null
+    }
+    await loadResumes()
+  }
+
+  function getData() {
+    return {
+      modules: modules.map((m) => ({ ...m })),
+      selectedTemplateKey: selectedTemplateKey.value,
+      basicInfo: { ...basicInfo },
+      educationList: educationList.map((e) => ({ ...e })),
+      skills: skills.value,
+      certificate: certificate.value,
+      workList: workList.map((w) => ({ ...w })),
+      projectList: projectList.map((p) => ({ ...p })),
+      awardList: awardList.map((a) => ({ ...a })),
+      selfIntro: selfIntro.value,
+    }
+  }
+
+  function loadData(data: any) {
+    if (!data) return
+    try {
+      if (data.modules) {
+        const byKey = new Map<string, ModuleConfig>()
+        ;(data.modules as ModuleConfig[]).forEach((m) => {
+          if (m?.key) byKey.set(m.key, m)
+        })
+
+        const orderedKeys = [
+          'basicInfo',
+          ...(data.modules as ModuleConfig[]).map((m) => m.key).filter((key) => key && key !== 'basicInfo'),
+        ]
+
+        const seen = new Set<string>()
+        const nextModules: ModuleConfig[] = []
+
+        orderedKeys.forEach((key) => {
+          if (seen.has(key)) return
+          seen.add(key)
+          const fallback = modules.find((m) => m.key === key)
+          if (!fallback) return
+          nextModules.push({ ...fallback, ...byKey.get(key) })
+        })
+
+        modules.forEach((m) => {
+          if (seen.has(m.key)) return
+          nextModules.push({ ...m, ...byKey.get(m.key) })
+        })
+
+        modules.splice(0, modules.length, ...nextModules)
+      }
+      selectedTemplateKey.value = normalizeResumeTemplateKey(data.selectedTemplateKey ?? data.selectedTemplateId)
+      if (data.basicInfo) Object.assign(basicInfo, data.basicInfo)
+      if (data.educationList) {
+        educationList.splice(0, educationList.length, ...data.educationList)
+      }
+      if (data.skills !== undefined) skills.value = data.skills
+      if (data.certificate !== undefined) certificate.value = data.certificate
+      if (data.workList) {
+        workList.splice(0, workList.length, ...data.workList)
+      }
+      if (data.projectList) {
+        projectList.splice(0, projectList.length, ...data.projectList)
+      }
+      if (data.awardList) {
+        awardList.splice(0, awardList.length, ...data.awardList)
+      }
+      if (data.selfIntro !== undefined) selfIntro.value = data.selfIntro
+    } catch (e) {
+      console.warn('Failed to load resume data', e)
+    }
+  }
+
   let saveLoadingTimer: ReturnType<typeof setTimeout> | null = null
 
   function markSavingState() {
@@ -476,10 +639,21 @@ export const useResumeStore = defineStore('resume', () => {
     addAward,
     removeAward,
     saveToStorage,
+    saveToCloud,
     autoSaveDelayMs: AUTO_SAVE_DELAY_MS,
     nextAutoSaveAt,
     lastSavedAt,
     lastSaveMode,
     isSaving,
+    isLoggedIn,
+    userId,
+    currentResumeId,
+    resumeVersions,
+    login,
+    register,
+    logout,
+    createNewVersion,
+    switchVersion,
+    removeVersion,
   }
 })
