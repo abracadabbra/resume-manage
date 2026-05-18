@@ -1,0 +1,195 @@
+[
+  {
+    "title": "Spring Boot 自动装配原理",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "Spring"],
+    "answer": {
+      "content": "Spring Boot 自动装配的核心是 @EnableAutoConfiguration 注解，配合 spring.factories 文件和 META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports 实现。\n\n原理流程：\n1. Spring Boot 启动时扫描 classpath 下的 META-INF/spring.factories（或 spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports）\n2. 读取 org.springframework.boot.autoconfigure.EnableAutoConfiguration 对应的配置类全限定名列表\n3. 通过反射实例化这些配置类，执行 @Bean 方法注册 BeanDefinition\n4. 最后通过 @Conditional 系列注解（@ConditionalOnClass、@ConditionalOnBean 等）做条件过滤，符合条件才真正注册\n\n常见自动配置类：DataSourceAutoConfiguration（数据库）、WebMvcAutoConfiguration（Web）、RedisAutoConfiguration（Redis）等。",
+      "followUp": [
+        { "question": "@ConditionalOnBean 和 @ConditionalOnClass 的区别？", "answer": "@ConditionalOnClass 当classpath下存在指定类时才生效；@ConditionalOnBean 当容器中已存在指定Bean时才生效。常用于确保依赖类或依赖Bean已加载。" },
+        { "question": "如何排查自动装配失效？", "answer": "1. 开启 debug 模式：debug=true 查看自动装配报告；2. 检查条件注解是否满足；3. 确认 starter 依赖是否正确引入；4. 查看是否被 @ExcludeAutoConfiguration 排除。" }
+      ]
+    }
+  },
+  {
+    "title": "Spring Cloud 服务注册与发现机制",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "Spring Cloud"],
+    "answer": {
+      "content": "以 Eureka 为例：\n\n服务注册：Provider 启动时发送 REST 请求向 Eureka Server 注册自己的元数据（IP、端口、健康检查等），每30秒发送心跳续约，默认90秒未续约则被剔除。\n\n服务发现：Consumer 启动时从 Eureka Server 获取服务提供者列表缓存到本地，服务调用时通过负载均衡（Ribbon）从本地缓存选取一个可用实例。\n\nEureka Server 集群：各节点互相复制注册表，实现高可用。节点间通过 Gossip 协议同步状态。",
+      "followUp": [
+        { "question": "Nacos 和 Eureka 的区别？", "answer": "Nacos 支持主动推送（CP+AP双模式），Eureka 只支持 AP。Nacos 集成了配置中心，Eureka 只有注册中心。Nacos 有控制台，运维更友好。" },
+        { "question": "服务挂了，服务消费者如何感知？", "answer": "1. Eureka 默认心跳检测，90秒未续约则剔除；2. Feign/Ribbon 会自动从本地缓存移除失效实例；3. 可以结合 Hystrix/Sentinel 做熔断降级；4. 也可以自定义健康检查接口 /health 做主动上报。" }
+      ]
+    }
+  },
+  {
+    "title": "MySQL 索引失效的常见场景",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "数据库"],
+    "answer": {
+      "content": "1. 使用左手原则：LIKE '%keyword' 前缀通配会导致索引失效\n2. 类型转换：WHERE name = 123（字符列用数字）导致全表扫描\n3. 使用函数/表达式：WHERE YEAR(create_time) = 2024 或 WHERE id + 1 = 10\n4. OR 连接：非索引列 OR 索引列，原则是必须前后都有索引才有效\n5. 最左前缀原则：复合索引 (a,b,c) 不使用 a，或跳过 b 直接用 c\n6. DISTINCT/ORDER BY：DISTINCT col 或 ORDER BY col 未在索引中\n7. NOT / <> / NOT IN / IS NULL/IS NOT NULL：可能导致全表扫描\n8. 数据量小：MySQL 优化器认为全表扫描更快",
+      "followUp": [
+        { "question": "如何确认索引是否生效？", "answer": "使用 EXPLAIN 查看执行计划，type 列显示 ALL 表示全表扫描，range 及以上表示使用了索引。key 列显示实际使用的索引名。" },
+        { "question": "复合索引的最左前缀原则具体是什么？", "answer": "复合索引 (a,b,c)，查询条件必须包含 a，才能利用索引。包含 a 的情况下，b 可以省略（索引跳跃扫描）。完全从 a 开始按顺序才能用到全部索引。" }
+      ]
+    }
+  },
+  {
+    "title": "Redis 持久化机制：RDB 和 AOF 的区别",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "Redis"],
+    "answer": {
+      "content": "RDB（快照）：定时生成数据快照，fork 子进程遍历内存写入 .rdb 文件。优点是恢复快（整个数据集），缺点是可能丢失最近一次快照后的数据。\n\nAOF（追加日志）：每条写命令追加到 .aof 文件，有三种刷盘策略：always（每条）、everysec（每秒，默认）、no（操作系统决定）。数据完整性高，文件会越来越大，需要后台重写压缩。\n\n混合持久化（4.0+）：开启后 AOF 重写时先用 RDB 格式写入数据，再用 AOF 格式追加增量。兼顾恢复速度和完整性。",
+      "followUp": [
+        { "question": "RDB 的 fork 过程会阻塞吗？", "answer": "fork 本身是 Copy-On-Write 的，父进程正常执行不阻塞。子进程 fork 期间会阻塞约几十毫秒。但 fork 后父进程修改数据时，会复制对应页表（写时复制），如果内存较大则页表复制开销明显。" },
+        { "question": "AOF 重写是什么？", "answer": "AOF 文件随时间会不断膨胀。重写是 fork 后台进程读取当前内存数据，用最短命令序列重写生成新的紧凑的 AOF 文件，然后替换旧文件。期间主进程继续写入旧 AOF，同时把增量写入 buffer，重写完成后合并。" }
+      ]
+    }
+  },
+  {
+    "title": "Kafka 消息丢失、重复消费、顺序消费如何处理",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "消息队列"],
+    "answer": {
+      "content": "消息丢失：\n- Producer：使用 acks=all + retries + enable.idempotence=true，Broker 半数以上写入成功才响应\n- Broker：replication.factor>=3 + min.insync.replicas=2\n- Consumer：手动提交 offset，处理完业务后再提交；或利用事务保证数据库+offset原子性\n\n重复消费：\n- 业务侧做幂等：唯一键/Redis 防重/数据库唯一索引\n- Producer 开启幂等：enable.idempotence=true，Kafka 自动去重\n\n顺序消费：\n- 发送端：同一 key 的消息发往同一 partition（Kafka 保证了同一 partition 内有序）\n- 消费端：单线程消费，或使用分段锁/队列隔离不同业务",
+      "followUp": [
+        { "question": "Kafka 如何保证不丢消息又不重复？", "answer": "这是 trade-off。业界通常：Producer 端 acks=all + 幂等；Consumer 端手动提交 offset + 业务幂等。Kafka 事务也可以实现 exactly-once，但性能损耗大，一般用于 Kafka 内核操作，不用于普通业务消息。" },
+        { "question": "消费者 rebalance 是什么？", "answer": "消费者组内成员变化时（如新增消费者、消费者宕机），Kafka 重新分配 partition 给存活消费者的过程。rebalance 期间消费者不能消费消息，可能造成重复消费或短暂不可用。使用 cooperative-sticky 策略可以减少影响。" }
+      ]
+    }
+  },
+  {
+    "title": "分布式 ID 生成方案",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "系统设计"],
+    "answer": {
+      "content": "常见方案：\n\n1. UUID：无序、占用空间大（36字符）、不可读，不推荐用于主键\n2. 数据库自增：单机无问题，分布式需要独立 ID 表服务或 MySQL 集群（分片键），扩展性有限\n3. Redis INCR：利用 Redis 原子递增，高性能，支持集群，但依赖 Redis 可用性\n4. 雪花算法（Snowflake）：64位 = 1位符号 + 41位时间戳 + 10位机器ID + 12位序列号。趋势递增，高性能，支持分布式\n5. ULID：比 Snowflake 更友好地支持随机访问和时间排序\n\nCRM 系统建议用 Snowflake 或其变种（如百度 UidGenerator、滴滴 TinyID），可以预设机器 ID 避免时钟回拨。",
+      "followUp": [
+        { "question": "雪花算法的时钟回拨问题如何处理？", "answer": "方案：1. 记录上一次时间戳，发生回拨时等待追上；2. 使用 Redis/数据库记录时间序列号；3. 拒绝回拨后生成的 ID（返回错误）。百度 UidGenerator 用 RingBuffer 缓存 ID 缓解此问题。" }
+      ]
+    }
+  },
+  {
+    "title": "MySQL MVCC 机制及隔离级别",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "数据库"],
+    "answer": {
+      "content": "MVCC（多版本并发控制）通过 undo log 和 ReadView 实现：\n\n快照读 vs 当前读：快照读基于 MVCC 生成历史快照；当前读（SELECT FOR UPDATE/INSERT）获取最新数据并加锁。\n\nReadView：包含 m_ids（活跃事务ID列表）、min_trx_id、max_trx_id、creator_trx_id。判断数据版本可见性时：trx_id < min_trx_id 则可见；trx_id > max_trx_id 不可见；在 m_ids 中则根据 creator_trx_id 判断。\n\n隔离级别：\n- READ UNCOMMITTED：直接读最新，无 MVCC\n- READ COMMITTED：每次 SELECT 生成新 ReadView\n- REPEATABLE READ（MySQL默认）：首次 SELECT 生成 ReadView，之后复用\n- SERIALIZABLE：快照读转为当前读，加锁",
+      "followUp": [
+        { "question": "RR 级别下 RR 能防止幻读吗？", "answer": "快照读通过 MVCC 防止幻读。但当前读（SELECT FOR UPDATE）通过 Next-Key Lock（记录锁+间隙锁）防止幻读。所以 MySQL RR 配合正确的锁机制可以防止幻读。" }
+      ]
+    }
+  },
+  {
+    "title": "Spring 循环依赖如何解决",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "Spring"],
+    "answer": {
+      "content": "Spring 通过三级缓存解决循环依赖：\n\n一级缓存（singletonObjects）：完全初始化好的单例 Bean\n二级缓存（earlySingletonObjects）：已实例化但未完成属性填充和初始化的 Bean（提前暴露）\n三级缓存（singletonFactories）：ObjectFactory，存储 Bean 工厂，用于创建二级缓存\n\n流程：A 创建时需要 B，调用 getBean(B) -> B 创建时需要 A，调用 getBean(A) -> A 通过三级缓存拿到自己的工厂，创建出半成品放入二级缓存，返回给 B -> B 完成创建 -> A 也完成创建\n\n构造器循环依赖无法解决：因为实例化时就需要入参，必须等到对方构造完成，形成死锁。Spring 会抛出 BeanCurrentlyInCreationException。\n\nprototype 作用域循环依赖无法解决：每次 getBean 都创建新实例，无缓存。",
+      "followUp": [
+        { "question": "为什么要用三级缓存而不是二级？", "answer": "二级缓存存的是半成品（已实例化未初始化），如果有 AOP 代理，需要在初始化完成后替换。二级缓存无法处理代理场景（代理对象和原对象不同）。三级缓存的工厂可以在需要时延迟创建代理，保证拿到的是最终代理对象。" }
+      ]
+    }
+  },
+  {
+    "title": "Redis 缓存穿透、击穿、雪崩及解决方案",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "Redis"],
+    "answer": {
+      "content": "穿透：查询不存在的数据绕过缓存直击数据库\n解决：1. 布隆过滤器（判断 key 是否存在）；2. 缓存空值（null）并设短过期时间；3. 参数合法性校验\n\n击穿：热点 key 过期瞬间，大量并发穿透到数据库\n解决：1. 互斥锁（SETNX）+ 双重检查；2. 永不过期（物理不过期 + 逻辑过期）；3. 热点数据预加载\n\n雪崩：大量 key 同时过期或 Redis 宕机\n解决：1. 过期时间加随机值；2. Redis 集群 + 哨兵高可用；3. 限流降级（Sentinel/Hystrix）；4. 数据库连接池预热\n\n数据不一致：缓存和数据库双写不一致\n解决：1. 延迟双删（先删缓存->更新数据库->延迟再删缓存）；2. 订阅 binlog 异步更新缓存；3. 分布式锁保证原子性",
+      "followUp": [
+        { "question": "布隆过滤器的原理和误判率？", "answer": "原理：k 个哈希函数映射到位数组，k 个位置都为1才判断存在。误判率公式：p = (1 - e^(-kn/m))^k，n=数据量，m=位数组大小。位数组越大误判率越低。只能用 增加位数组长度 或 增加哈希函数数量 来降低误判。" }
+      ]
+    }
+  },
+  {
+    "title": "Spring 事务传播行为",
+    "difficulty": "basic",
+    "labels": ["必须掌握", "Spring"],
+    "answer": {
+      "content": "Spring 7种传播行为：\n\n1. REQUIRED（默认）：有事务则加入，无则创建新事务\n2. REQUIRES_NEW：挂起当前事务，创建新事务，两者相互独立\n3. SUPPORTS：有事务则加入，无则非事务执行\n4. NOT_SUPPORTED：挂起当前事务，以非事务执行\n5. MANDATORY：必须在事务中执行，无则抛异常\n6. NEVER：必须非事务执行，有事务则抛异常\n7. NESTED：嵌套事务，基于 Savepoint 机制，外层回滚内层也回滚，内层可单独回滚不影响外层（需数据库支持，如 MySQL）",
+      "followUp": [
+        { "question": "NESTED 和 REQUIRES_NEW 的区别？", "answer": "REQUIRES_NEW 完完全全两个独立事务，内外互不影响（提交/回滚各自独立）。NESTED 是同一事务的嵌套，使用 Savepoint，外层回滚内层一定回滚，内层回滚可以是 savepoint 回滚，不影响外层继续执行。性能上 NESTED 优于 REQUIRES_NEW（不需要真正开启新事务）。" }
+      ]
+    }
+  },
+  {
+    "title": "CRM 系统中权限体系设计",
+    "difficulty": "advanced",
+    "labels": ["深入理解", "CRM", "权限"],
+    "answer": {
+      "content": "经典 RBAC 模型（基于角色的访问控制）：\n\n核心表结构：\n- 用户表（sys_user）、角色表（sys_role）、权限表（sys_permission）\n- 用户-角色关联表（sys_user_role）、角色-权限关联表（sys_role_permission）\n- 数据权限表（sys_data_permission）：用于行级数据隔离\n\n功能权限粒度：\n- 菜单级：用户能看到哪些菜单\n- 按钮级：用户能看到哪些操作按钮\n- 字段级：用户能看到哪些字段（数据脱敏）\n\n数据权限：组织架构（dept_id）关联，常用 SQL 拦截器在查询 WHERE 条件中自动拼接数据权限条件。\n\nSaaS 多租户：每个租户独立数据隔离，租户 ID 作为所有表的公共字段，查询时自动注入租户过滤条件。",
+      "followUp": [
+        { "question": "CRM 中如何实现细粒度的按钮权限控制？", "answer": "前端：后端返回权限标识列表（permissionList），前端 v-if 判断是否显示。后端：接口层加权限校验注解 @RequiresPermissions(\"sys:user:delete\")，Shiro/SpringSecurity 拦截校验。数据库：权限标识字符串存 role_permission 表，关联到角色。" },
+        { "question": "如何设计一个灵活的工作流引擎？", "answer": "核心模型：流程定义（节点+连线）+ 流程实例（各节点状态）+ 任务表（待办）。节点类型：审批节点（单人/会签/或签）、自动节点、路由节点。流转规则：连线条件表达式（SpEL）。持久化：状态机模式管理流程状态变更，保证原子性。" }
+      ]
+    }
+  },
+  {
+    "title": "Docker 核心概念与常用命令",
+    "difficulty": "basic",
+    "labels": ["加分项", "DevOps"],
+    "answer": {
+      "content": "核心概念：\n- 镜像（Image）：只读模板，层层叠加 UnionFS\n- 容器（Container）：镜像的运行实例，隔离的文件系统\n- 仓库（Registry）：Docker Hub / 私有仓库存储镜像\n\n常用命令：\n镜像：docker build -t name:tag . | docker push | docker pull | docker images | docker rmi\n容器：docker run -d -p 8080:8080 --name app | docker ps | docker logs -f | docker exec -it | docker stop/start/restart | docker rm -f\n\nDockerfile 关键指令：\nFROM（基础镜像）-> COPY/ADD（复制文件）-> RUN（构建时执行）-> ENV（环境变量）-> EXPOSE（端口）-> CMD/ENTRYPOINT（运行时执行）\n\n最佳实践：多阶段构建减小体积 .dockerignore 减少上下文，利用层缓存优化构建顺序。",
+      "followUp": [
+        { "question": "Docker 和 K8S 的关系是什么？", "answer": "Docker 是容器化技术，负责打包和运行。K8S 是容器编排平台，负责管理多个 Docker 容器：自动化部署、扩缩容、负载均衡、自愈（容器挂了自动重启）、服务发现等。K8S 管理 Pod（1~N个容器），一个 Pod 里的容器共享网络和存储。" }
+      ]
+    }
+  },
+  {
+    "title": "K8S Pod 创建流程与核心概念",
+    "difficulty": "intermediate",
+    "labels": ["加分项", "K8S"],
+    "answer": {
+      "content": "Pod 创建流程：\n1. kubectl 发送创建请求到 API Server\n2. API Server 将 Pod 对象写入 etcd\n3. Scheduler 监听 API Server，发现未绑定 Node 的 Pod，开始调度（计算最优节点）\n4. Scheduler 更新 Pod 的 nodeName 字段到 etcd\n5. 对应 Node 的 kubelet 监听 API Server，发现有新 Pod 分配到本节点\n6. kubelet 调用容器运行时（containerd/docker）pull 镜像、创建容器、启动 Pod\n7. kubelet 更新 Pod 状态到 API Server\n\n核心概念：\n- Deployment：管理无状态应用，支持滚动更新、回滚、扩缩容\n- StatefulSet：管理有状态应用（需要持久化存储、固定网络标识）\n- DaemonSet：每个节点运行一个副本（日志收集、监控）\n- Service：固定 ClusterIP，提供负载均衡和服务发现\n- Ingress：HTTP/HTTPS 路由入口",
+      "followUp": [
+        { "question": "K8S 如何实现自动故障恢复？", "answer": "通过 Controller（控制器）实现。Deployment 通过 ReplicaSet 监控 Pod 数量，如果 Pod 挂了，ReplicaSet 会自动创建新的 Pod。kubelet 也负责监控容器状态，容器异常退出时自动重启。HPA（水平自动扩缩容）根据 CPU/内存指标自动增减 Pod 数量。" }
+      ]
+    }
+  },
+  {
+    "title": "系统设计：如何设计一个秒杀系统",
+    "difficulty": "advanced",
+    "labels": ["深入理解", "系统设计"],
+    "answer": {
+      "content": "核心问题：高并发写、库存超卖、一致性\n\n架构分层：\n1. CDN + Nginx 缓存静态资源，分担前端流量\n2. 限流：Guava RateLimiter / Sentinel / Nginx 限制请求速率\n3. 消息队列削峰：库存预扣减，下单请求进入 Kafka/RocketMQ，异步处理\n4. Redis 缓存库存：库存数量预加载到 Redis，Lua 脚本原子扣减（DECR）\n5. 分布式锁：Redisson 锁住库存操作，防止超卖\n6. 数据库层：最终一致性，库存扣减用 UPDATE SET stock = stock - 1 WHERE id = ? AND stock > 0\n\n库存超卖解决方案：\n方案A：Redis 原子扣减 + 下游异步落库（最终一致性）\n方案B：数据库乐观锁（版本号）+ 重试\n方案C：Redis + 数据库双写，库存对账",
+      "followUp": [
+        { "question": "如何保证库存不超卖又不大量漏单？", "answer": "核心是分层扣减。1. Redis Lua 原子扣减（不超卖）；2. 扣减成功后发MQ消息；3. MQ 消费者批量落库，超时重试；4. 定时对账脚本核对 Redis 和 DB 库存，发现差异用 Redis 为准重新放回队列。库存为0时直接返回秒杀结束，不再写库。" }
+      ]
+    }
+  },
+  {
+    "title": "MySQL 主从复制原理与延迟问题处理",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "数据库"],
+    "answer": {
+      "content": "主从复制原理：\n1. Master 执行写操作，记录到 binlog\n2. Master 创建 binlog dump 线程，推送 binlog 给 Slave\n3. Slave 的 IO Thread 接收 binlog，写入 relay log\n4. Slave 的 SQL Thread 读取 relay log，在本地执行（replay）\n\n三种复制方式：异步复制（默认，性能高但可能丢数据）、半同步复制（至少一个 Slave 确认）、全同步复制（所有 Slave 完成）\n\n延迟原因：大事务执行时间长、Slave 配置低（单线程 replay）、网络延迟、主从库负载不均\n\n处理方案：\n- 大表 DDL 使用 gh-ost / pt-online-schema-change 工具\n- 读写分离 + 延迟感知（延迟超过阈值路由到主库）\n- 分库分表减少单库数据量\n- 业务层面接受最终一致性，读从库超时切主库",
+      "followUp": [
+        { "question": "如何判断主从延迟？", "answer": "1. show slave status 的 Seconds_Behind_Master（slave_net_delay = 0 表示无延迟）；2. pt-heartbeat 主动心跳检测（更精确）；3. 监控 binlog 位点差异；4. 业务层面记录写入时间戳，对比查询结果是否包含最新写入。" }
+      ]
+    }
+  },
+  {
+    "title": "Elasticsearch 查询原理与性能优化",
+    "difficulty": "intermediate",
+    "labels": ["必须掌握", "ES"],
+    "answer": {
+      "content": "存储结构：索引 -> 分片（默认5个）-> 分片副本 -> Lucene Segment -> T IMDK（倒排索引）\n\n查询流程（query then fetch）：\n1. 查询请求发到任意节点（coordinate node），广播到所有分片\n2. 各分片执行 query（根据倒排索引找到 doc IDs），返回 doc IDs + 排序值\n3. coordinate node 汇总结果，按分数排序，取 top N doc IDs\n4. 第二轮 fetch：根据 doc IDs 去对应分片取完整文档\n5. 返回客户端\n\n性能优化：\n- 分页过深：search_after 游标查询，禁止 deep pagination（from+size > 10000）\n- 慢查询：开启 slowlog，分析查询耗时\n- 冷热分离：热数据放 SSD + 高配节点，冷数据归档\n- 减少返回字段：_source filtering 只查必要字段\n- 路由优化：按业务字段 routing 减少扫描分片数",
+      "followUp": [
+        { "question": "ES 写入数据后多久可以查到？", "answer": "默认1秒（refresh_interval=1s），数据写入后经过 refresh 生成新 segment 才能被搜索到。可以通过：1. 手动 refresh（POST /index/_refresh）；2. 写入时设置 refresh=true（立即刷新，影响性能）；3. 调整 refresh_interval 到更长时间（如5s）提升写入吞吐量。" }
+      ]
+    }
+  },
+  {
+    "title": "前后端协作：RESTful API 设计规范",
+    "difficulty": "basic",
+    "labels": ["加分项", "前后端协作"],
+    "answer": {
+      "content": "RESTful 核心原则：资源（名词）+ HTTP 方法（动词）\n\nURL 设计：\n- GET /api/users -- 查询用户列表\n- GET /api/users/{id} -- 查询单个用户\n- POST /api/users -- 创建用户\n- PUT /api/users/{id} -- 全量更新用户\n- PATCH /api/users/{id} -- 部分更新\n- DELETE /api/users/{id} -- 删除用户\n\n统一响应格式：\n{\n  \"code\": 200,\n  \"message\": \"success\",\n  \"data\": { ... },\n  \"timestamp\": 1715000000000\n}\n\n状态码规范：\n- 2xx：200成功、201创建、204无内容\n- 4xx：400参数错误、401未认证、403禁止访问、404未找到\n- 5xx：500服务端异常\n\n最佳实践：版本号 /api/v1/users；分页参数 /api/users?page=1&size=20；过滤排序 ?status=active&sort=createTime,desc",
+      "followUp": [
+        { "question": "非 RESTful 的场景怎么处理？", "answer": "RPC 风格 / GraphQL / WebSocket。RPC：如 POST /api/user/login，POST /api/order/cancel，直接描述动作。GraphQL：前端按需查询字段，一次请求获取多资源。WebSocket：实时推送场景。REST 适合标准 CRUD，复杂业务场景不要强行 REST。" }
+      ]
+    }
+  }
+]
