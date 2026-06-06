@@ -42,6 +42,7 @@ const A4_PDF_INNER_HEIGHT_MM = A4_HEIGHT_MM - 2 * PAGE_MARGIN_MM
 
 const pageBreaks = ref<number[]>([])
 const lastPageSpacerHeight = ref(0)
+const paperHeight = ref(A4_HEIGHT)
 
 type PageLayout = {
   breaks: number[]
@@ -57,6 +58,7 @@ type PageLayout = {
 const SAFE_PAGE_BOTTOM_GAP = Math.max(4, Math.round(PAGE_MARGIN_PX * 0.25))
 const MIN_PAGE_CONTENT_HEIGHT = 160
 const BREAK_MIN_SPACING = 12
+const BREAK_AFTER_LINE_GAP = Math.max(2, Math.round(PAGE_MARGIN_PX * 0.15))
 
 type LineBand = { top: number; bottom: number }
 
@@ -95,7 +97,9 @@ function collectLineBands(root: HTMLElement, contentHeight: number): LineBand[] 
 
 /**
  * 本页允许排到的最底行：用「行底 <= pageEnd」找最后一行能完整落在本页的；
- * 断点 = 下一行 top。若没有下一行，说明从 minTop 起正文已全部落在本页内（余量只是模板 padding），
+ * 断点 = 本页最后一行之后。若没有能放下的行，再回退到本页第一行 top。
+ * 避免用「下一行 top」切片，因为下一段/下一模块的段前距会被留在上一页底部，
+ * 看起来像明明还有空间却提前进入下一页。
  * 应返回 null，禁止再用 pageEnd 在「无字区域」切一刀 —— 否则会多出一整页空白 + spacer。
  */
 function chooseBreakAfterLastLineThatFits(
@@ -114,26 +118,7 @@ function chooseBreakAfterLastLineThatFits(
   }
 
   if (lastFit) {
-    let nextTop: number | null = null
-    for (const b of bands) {
-      if (b.top <= lastFit.top) continue
-      if (b.top >= lastFit.bottom - 1) {
-        if (nextTop === null || b.top < nextTop) nextTop = b.top
-      }
-    }
-    if (nextTop === null) {
-      let fallbackNext: number | null = null
-      for (const b of bands) {
-        if (b.top > lastFit.bottom + 2 && b.top <= maxY) {
-          if (fallbackNext === null || b.top < fallbackNext) fallbackNext = b.top
-        }
-      }
-      if (fallbackNext === null) {
-        return null
-      }
-      return Math.min(Math.max(fallbackNext, minTop), maxY)
-    }
-    const y = nextTop
+    const y = Math.min(lastFit.bottom + BREAK_AFTER_LINE_GAP, pageEnd)
     return Math.min(Math.max(y, minTop), maxY)
   }
 
@@ -146,6 +131,11 @@ function chooseBreakAfterLastLineThatFits(
   if (firstOnPage !== null) return firstOnPage
 
   return Math.min(Math.max(Math.round(pageEnd), minTop), maxY)
+}
+
+function hasTextAfterBreak(bands: LineBand[], breakTop: number, contentHeight: number): boolean {
+  const maxY = contentHeight - BREAK_MIN_SPACING
+  return bands.some((b) => b.top > breakTop + 1 && b.top <= maxY)
 }
 
 function computePageLayout(root: HTMLElement): PageLayout {
@@ -184,13 +174,18 @@ function computePageLayout(root: HTMLElement): PageLayout {
     currentTop = clampedBreak
   }
 
-  const usedOnLastPage = Math.max(0, contentHeight - currentTop)
-  const lastPageUsable =
-    breaks.length === 0 ? FIRST_PAGE_USABLE_CONTENT_HEIGHT : USABLE_PAGE_CONTENT_HEIGHT
-  const spacerHeight =
-    usedOnLastPage > 0 && usedOnLastPage < lastPageUsable ? lastPageUsable - usedOnLastPage : 0
+  let paperEnd = contentHeight
+  while (breaks.length > 0) {
+    const lastBreak = breaks[breaks.length - 1]
+    if (lastBreak === undefined || hasTextAfterBreak(lineBands, lastBreak, contentHeight)) break
+    paperEnd = lastBreak
+    breaks.pop()
+  }
 
-  const innerTotalHeight = contentHeight + spacerHeight
+  currentTop = breaks[breaks.length - 1] ?? 0
+  const spacerHeight = 0
+
+  const innerTotalHeight = Math.max(A4_HEIGHT, paperEnd + spacerHeight)
   return {
     breaks,
     lastPageSpacerHeight: spacerHeight,
@@ -229,6 +224,7 @@ async function refreshPreviewPageLayout(): Promise<PageLayout | null> {
   const layout = computePageLayout(contentRef.value)
   pageBreaks.value = layout.breaks
   lastPageSpacerHeight.value = layout.lastPageSpacerHeight
+  paperHeight.value = layout.fullPaperHeight
   return layout
 }
 
@@ -495,7 +491,7 @@ async function exportPDF(mode: ExportQualityMode) {
           class="paper"
           :style="{
             width: `${A4_WIDTH}px`,
-            minHeight: `${A4_HEIGHT}px`,
+            minHeight: `${paperHeight}px`,
             height: 'auto',
             padding: '0',
           }"

@@ -5,6 +5,13 @@ import { useResumeTemplateData } from '../../shared/useResumeTemplateData'
 const { store, hasAnyContent, lineOneMeta, lineTwoMeta, lineThreeMeta, moduleOrderStyle } = useResumeTemplateData()
 
 const hasCustomLine = (line: string) => line && line.trim()
+
+function isLastVisibleSection(key: string): boolean {
+  const visibleModuleKeys = store.modules
+    .filter((module) => module.visible && module.key !== 'basicInfo')
+    .map((module) => module.key)
+  return visibleModuleKeys[visibleModuleKeys.length - 1] === key
+}
 </script>
 
 <template>
@@ -18,7 +25,7 @@ const hasCustomLine = (line: string) => line && line.trim()
         <h1 class="name">{{ store.basicInfo.name || '软件工程师模板' }}</h1>
 
         <!-- Custom header lines mode -->
-        <template v-if="store.basicInfo.line1 || store.basicInfo.line2 || store.basicInfo.line3">
+        <template v-if="store.basicInfo.line1 || store.basicInfo.line2 || store.basicInfo.line3 || store.basicInfo.line4">
           <div v-if="hasCustomLine(store.basicInfo.line1)" class="contact-line">
             <span class="meta-item custom-line">{{ store.basicInfo.line1 }}</span>
           </div>
@@ -27,6 +34,9 @@ const hasCustomLine = (line: string) => line && line.trim()
           </div>
           <div v-if="hasCustomLine(store.basicInfo.line3)" class="contact-line">
             <span class="meta-item custom-line">{{ store.basicInfo.line3 }}</span>
+          </div>
+          <div v-if="hasCustomLine(store.basicInfo.line4)" class="contact-line">
+            <span class="meta-item custom-line">{{ store.basicInfo.line4 }}</span>
           </div>
         </template>
 
@@ -81,6 +91,7 @@ const hasCustomLine = (line: string) => line && line.trim()
     <section
       v-if="store.isModuleVisible('education') && store.educationList.some((e) => e.school)"
       class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('education') }"
       :style="moduleOrderStyle('education')"
     >
       <h2 class="section-title">教育经历</h2>
@@ -105,6 +116,8 @@ const hasCustomLine = (line: string) => line && line.trim()
             <span v-if="edu.degree">{{ edu.degree }}</span>
             <span v-if="(edu.major || edu.degree) && edu.college" class="dot-sep">·</span>
             <span v-if="edu.college">{{ edu.college }}</span>
+            <span v-if="edu.type" class="dot-sep">·</span>
+            <span v-if="edu.type">{{ edu.type }}</span>
           </p>
           <span class="entry-date">{{ edu.startDate }} ~ {{ edu.endDate || '至今' }}</span>
         </div>
@@ -112,12 +125,22 @@ const hasCustomLine = (line: string) => line && line.trim()
       </article>
     </section>
 
-    <section v-if="store.isModuleVisible('skills') && store.skills" class="resume-section" :style="moduleOrderStyle('skills')">
+    <section
+      v-if="store.isModuleVisible('skills') && store.skills"
+      class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('skills') }"
+      :style="moduleOrderStyle('skills')"
+    >
       <h2 class="section-title">专业技能</h2>
       <div class="entry-rich" v-html="store.skills"></div>
     </section>
 
-    <section v-if="store.isModuleVisible('certificate') && store.certificate" class="resume-section" :style="moduleOrderStyle('certificate')">
+    <section
+      v-if="store.isModuleVisible('certificate') && store.certificate"
+      class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('certificate') }"
+      :style="moduleOrderStyle('certificate')"
+    >
       <h2 class="section-title">技能证书</h2>
       <div class="certificate-list">
         <div v-for="(line, idx) in store.certificate.split('\n').filter(l => l.trim())" :key="idx" class="certificate-item">
@@ -129,6 +152,7 @@ const hasCustomLine = (line: string) => line && line.trim()
     <section
       v-if="store.isModuleVisible('workExperience') && store.workList.some((w) => w.company)"
       class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('workExperience') }"
       :style="moduleOrderStyle('workExperience')"
     >
       <h2 class="section-title">工作经历</h2>
@@ -151,6 +175,7 @@ const hasCustomLine = (line: string) => line && line.trim()
     <section
       v-if="store.isModuleVisible('projectExperience') && store.projectList.some((p) => p.name)"
       class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('projectExperience') }"
       :style="moduleOrderStyle('projectExperience')"
     >
       <h2 class="section-title">项目经历</h2>
@@ -177,6 +202,7 @@ const hasCustomLine = (line: string) => line && line.trim()
     <section
       v-if="store.isModuleVisible('awards') && store.awardList.some((a) => a.name)"
       class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('awards') }"
       :style="moduleOrderStyle('awards')"
     >
       <h2 class="section-title">荣誉奖项</h2>
@@ -192,6 +218,7 @@ const hasCustomLine = (line: string) => line && line.trim()
     <section
       v-if="store.isModuleVisible('selfIntro') && store.selfIntro"
       class="resume-section"
+      :class="{ 'resume-section-last': isLastVisibleSection('selfIntro') }"
       :style="moduleOrderStyle('selfIntro')"
     >
       <h2 class="section-title">个人简介</h2>
@@ -209,7 +236,7 @@ const hasCustomLine = (line: string) => line && line.trim()
   box-sizing: border-box;
   width: 100%;
   min-height: 100%;
-  padding: 28px 28px 40px;
+  padding: 28px 28px 16px;
   color: #222;
   display: flex;
   flex-direction: column;
@@ -308,12 +335,15 @@ const hasCustomLine = (line: string) => line && line.trim()
 /* ── Section headers: left blue border + grey bg ── */
 .resume-section {
   margin-bottom: 12px;
-  break-inside: avoid;
-  page-break-inside: avoid;
-  break-after: page;
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 .resume-section:last-of-type {
+  margin-bottom: 0;
+}
+
+.resume-section-last {
   margin-bottom: 0;
 }
 
@@ -335,8 +365,8 @@ const hasCustomLine = (line: string) => line && line.trim()
 /* ── Entry layout ── */
 .entry {
   margin-bottom: 12px;
-  break-inside: avoid;
-  page-break-inside: avoid;
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 .entry:last-child {
@@ -431,8 +461,8 @@ const hasCustomLine = (line: string) => line && line.trim()
   color: #333;
   font-size: 12px;
   line-height: 1.75;
-  break-inside: avoid;
-  page-break-inside: avoid;
+  break-inside: auto;
+  page-break-inside: auto;
 }
 
 .certificate-list {
@@ -499,7 +529,7 @@ const hasCustomLine = (line: string) => line && line.trim()
 }
 
 :deep(.entry-rich ol li::marker) {
-  color: #333;
+  color: currentColor;
   font-size: 1em;
   font-weight: inherit;
 }
