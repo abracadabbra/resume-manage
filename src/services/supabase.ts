@@ -1,4 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { QuestionBankCloudData, QuestionBankCloudRecord } from '@/stores/questionBankCloud'
 
 const supabaseUrl = 'https://plymffomjwgaisicytbl.supabase.co'
 const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBseW1mZm9tandnYWlzaWN5dGJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NjY2MzYsImV4cCI6MjA5MTA0MjYzNn0.EhktPQqFanIbF6ButJpyczFmOvrwnO9xNvdBkp4WomA'
@@ -9,7 +10,7 @@ export interface ResumeRecord {
   id: string
   user_id: string
   name: string
-  data: any
+  data: unknown
   version: number
   is_active: boolean
   created_at: string
@@ -88,7 +89,7 @@ export async function getActiveResume(userId: string) {
   return data as ResumeRecord | null
 }
 
-export async function createResume(userId: string, name: string, data: any) {
+export async function createResume(userId: string, name: string, data: unknown) {
   const { data: existingResumes } = await supabase
     .from('resumes')
     .select('version')
@@ -116,7 +117,7 @@ export async function createResume(userId: string, name: string, data: any) {
   return resume as ResumeRecord
 }
 
-export async function updateResume(id: string, data: any) {
+export async function updateResume(id: string, data: unknown) {
   const { data: resume, error } = await supabase
     .from('resumes')
     .update({ data, updated_at: new Date().toISOString() })
@@ -149,4 +150,34 @@ export async function deleteResume(id: string) {
     .eq('id', id)
   
   if (error) throw error
+}
+
+export async function getQuestionBankState(userId: string) {
+  const { data, error } = await supabase
+    .from('question_bank_states')
+    .select('*')
+    .eq('user_id', userId)
+    .limit(1)
+    .single()
+
+  if (error && error.code !== 'PGRST116') throw error
+  return data as QuestionBankCloudRecord | null
+}
+
+export async function upsertQuestionBankState(userId: string, data: QuestionBankCloudData) {
+  const { data: record, error } = await supabase
+    .from('question_bank_states')
+    .upsert(
+      {
+        user_id: userId,
+        data,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'user_id' },
+    )
+    .select()
+    .single()
+
+  if (error) throw error
+  return record as QuestionBankCloudRecord
 }

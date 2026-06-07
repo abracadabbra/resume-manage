@@ -3,14 +3,12 @@ import JdSelector from './JdSelector.vue'
 import JdQuestionList from './JdQuestionList.vue'
 import JdQuestionDetail from './JdQuestionDetail.vue'
 import JdAdder from './JdAdder.vue'
-
-import { useJdProfileStore } from '@/stores/jdProfile'
-
-const store = useJdProfileStore()
+import JdQuestionGenerator from './JdQuestionGenerator.vue'
 </script>
 
 <template>
   <div class="jd-special-panel">
+    <JdQuestionGenerator />
     <div class="panel-body">
       <JdSelector />
       <JdQuestionList />

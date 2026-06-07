@@ -26,13 +26,29 @@ const collapsed = ref(false)
       >
         <div class="entry-header">
           <span class="entry-index">项目经历 {{ index + 1 }}</span>
-          <button
-            v-if="store.projectList.length > 1"
-            class="btn-remove"
-            @click="store.removeProject(proj.id)"
-          >
-            ✕
-          </button>
+          <div class="entry-actions">
+            <button
+              class="btn-move"
+              :disabled="!store.canMoveProject(proj.id, 'up')"
+              @click="store.moveProject(proj.id, 'up')"
+            >
+              ↑
+            </button>
+            <button
+              class="btn-move"
+              :disabled="!store.canMoveProject(proj.id, 'down')"
+              @click="store.moveProject(proj.id, 'down')"
+            >
+              ↓
+            </button>
+            <button
+              v-if="store.projectList.length > 1"
+              class="btn-remove"
+              @click="store.removeProject(proj.id)"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         <div class="form-grid">
@@ -151,6 +167,37 @@ const collapsed = ref(false)
   align-items: center;
   justify-content: space-between;
   margin-bottom: var(--spacing-md);
+}
+
+.entry-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.btn-move {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: var(--gray-200);
+  color: var(--gray-600);
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all var(--transition-fast);
+}
+
+.btn-move:hover:not(:disabled) {
+  background: var(--primary-500);
+  color: white;
+}
+
+.btn-move:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
 }
 
 .entry-index {

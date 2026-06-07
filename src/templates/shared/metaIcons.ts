@@ -1,4 +1,4 @@
-﻿export type MetaIconKey =
+export type MetaIconKey =
   | 'phone'
   | 'mail'
   | 'user'

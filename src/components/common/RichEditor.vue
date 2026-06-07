@@ -14,6 +14,7 @@ const emit = defineEmits<{
 const editorRef = ref<HTMLDivElement | null>(null)
 const isFocused = ref(false)
 const showPlaceholder = ref(!props.modelValue)
+const savedSelection = ref<Range | null>(null)
 
 // Sync incoming model value → DOM (only when not focused to avoid cursor jumps)
 watch(() => props.modelValue, (val) => {
@@ -39,14 +40,49 @@ function onInput() {
   emit('update:modelValue', clean)
 }
 
+function isSelectionInsideEditor(selection: Selection) {
+  const editor = editorRef.value
+  if (!editor || selection.rangeCount === 0) return false
+  const range = selection.getRangeAt(0)
+  return editor.contains(range.commonAncestorContainer)
+}
+
+function saveSelection() {
+  const selection = window.getSelection()
+  if (!selection || !isSelectionInsideEditor(selection)) return
+  savedSelection.value = selection.getRangeAt(0).cloneRange()
+}
+
+function restoreSelection() {
+  const selection = window.getSelection()
+  const range = savedSelection.value
+  if (!selection || !range) return false
+  editorRef.value?.focus()
+  selection.removeAllRanges()
+  selection.addRange(range)
+  return true
+}
+
+function ensureEditorSelection() {
+  const selection = window.getSelection()
+  if (selection && isSelectionInsideEditor(selection)) {
+    savedSelection.value = selection.getRangeAt(0).cloneRange()
+    return true
+  }
+  return restoreSelection()
+}
+
 function execCmd(cmd: string, value?: string) {
+  ensureEditorSelection()
   document.execCommand(cmd, false, value)
+  saveSelection()
   editorRef.value?.focus()
   onInput()
 }
 
 function setFontSize(e: Event) {
   const size = (e.target as HTMLSelectElement).value
+  ensureEditorSelection()
   // execCommand fontSize uses 1-7 scale; we use a span approach instead
   document.execCommand('fontSize', false, '7')
   const fontEls = editorRef.value?.querySelectorAll('font[size="7"]')
@@ -60,6 +96,16 @@ function setFontSize(e: Event) {
   applyFontSizeToSelectedListItems(size)
   editorRef.value?.focus()
   onInput()
+}
+
+function normalizeForegroundColor(color: string) {
+  const fontEls = editorRef.value?.querySelectorAll(`font[color="${color}"]`)
+  fontEls?.forEach(el => {
+    const span = document.createElement('span')
+    span.style.color = color
+    span.innerHTML = el.innerHTML
+    el.parentNode?.replaceChild(span, el)
+  })
 }
 
 function applyFontSizeToSelectedListItems(size: string) {
@@ -102,7 +148,22 @@ function applyFontSizeToSelectedListItems(size: string) {
 
 function setColor(e: Event) {
   const color = (e.target as HTMLInputElement).value
-  execCmd('foreColor', color)
+  ensureEditorSelection()
+  document.execCommand('foreColor', false, color)
+  normalizeForegroundColor(color)
+  saveSelection()
+  editorRef.value?.focus()
+  onInput()
+}
+
+function handleFocus() {
+  isFocused.value = true
+  saveSelection()
+}
+
+function handleBlur() {
+  saveSelection()
+  isFocused.value = false
 }
 
 function isActive(cmd: string): boolean {
@@ -124,7 +185,7 @@ function isActive(cmd: string): boolean {
         <u>U</u>
       </button>
       <div class="tool-divider"></div>
-      <select class="tool-select" @change="setFontSize" title="字体大小">
+      <select class="tool-select" @mousedown="saveSelection" @change="setFontSize" title="字体大小">
         <option value="">字号</option>
         <option value="10px">10</option>
         <option value="11px">11</option>
@@ -135,7 +196,7 @@ function isActive(cmd: string): boolean {
         <option value="18px">18</option>
         <option value="20px">20</option>
       </select>
-      <input type="color" class="tool-color" @change="setColor" title="字体颜色" value="#333333" />
+      <input type="color" class="tool-color" @mousedown="saveSelection" @change="setColor" title="字体颜色" value="#333333" />
       <div class="tool-divider"></div>
       <button type="button" class="tool-btn" @mousedown.prevent="execCmd('insertUnorderedList')" title="无序列表">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
@@ -168,8 +229,10 @@ function isActive(cmd: string): boolean {
         contenteditable="true"
         :style="{ minHeight: (rows || 3) * 1.8 + 'em' }"
         @input="onInput"
-        @focus="isFocused = true"
-        @blur="isFocused = false"
+        @mouseup="saveSelection"
+        @keyup="saveSelection"
+        @focus="handleFocus"
+        @blur="handleBlur"
         spellcheck="false"
       ></div>
       <div v-if="showPlaceholder" class="editor-placeholder">{{ placeholder || '请输入内容...' }}</div>

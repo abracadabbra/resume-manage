@@ -9,6 +9,11 @@ import {
   type ResumeTemplateKey,
 } from '@/templates/resume'
 import { generateResumeMarkdown, downloadMarkdown } from '@/services/exportMarkdown'
+import {
+  buildPaginationDiagnostics,
+  type PaginationDiagnostics,
+  type PaginationSegment,
+} from '@/services/paginationDiagnostics'
 
 const store = useResumeStore()
 const resumeRef = ref<HTMLElement | null>(null)
@@ -20,6 +25,8 @@ type ExportQualityMode = 'compressed' | 'hd'
 const exportMenuOpen = ref(false)
 const exportMenuRef = ref<HTMLElement | null>(null)
 const templatePickerOpen = ref(false)
+const diagnosticMode = ref(false)
+const currentLayout = ref<PageLayout | null>(null)
 
 // AI Generated Start
 /** 预览画布宽度（px）对应 A4 纸宽；长边按同比例换算，与 ISO A4 几何一致 */
@@ -61,6 +68,41 @@ const BREAK_MIN_SPACING = 12
 const BREAK_AFTER_LINE_GAP = Math.max(2, Math.round(PAGE_MARGIN_PX * 0.15))
 
 type LineBand = { top: number; bottom: number }
+
+function clipDiagnosticLabel(value: string): string {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  return normalized.length > 24 ? `${normalized.slice(0, 24)}...` : normalized
+}
+
+function collectPaginationSegments(root: HTMLElement): PaginationSegment[] {
+  const rootRect = root.getBoundingClientRect()
+  const unique = new Set<string>()
+  const segments: PaginationSegment[] = []
+  const candidates = Array.from(root.querySelectorAll<HTMLElement>('*'))
+
+  for (const element of candidates) {
+    const text = clipDiagnosticLabel(element.textContent ?? '')
+    if (!text) continue
+
+    const style = window.getComputedStyle(element)
+    if (style.display === 'inline' || style.display === 'contents' || style.visibility === 'hidden') continue
+
+    const rect = element.getBoundingClientRect()
+    const height = rect.height
+    if (height < 18 || height > 360) continue
+
+    const top = Math.max(0, Math.round(rect.top - rootRect.top))
+    const bottom = Math.max(top, Math.round(rect.bottom - rootRect.top))
+    const key = `${top}:${bottom}:${text}`
+    if (unique.has(key)) continue
+    unique.add(key)
+    segments.push({ top, bottom, label: text })
+  }
+
+  segments.sort((a, b) => a.top - b.top || a.bottom - b.bottom)
+  return segments
+}
 
 /** 收集每行文字的 top/bottom（相对 root），不按块类型区分 */
 function collectLineBands(root: HTMLElement, contentHeight: number): LineBand[] {
@@ -202,6 +244,29 @@ const currentTemplate = computed<ResumeTemplateDefinition>(
 )
 const currentTemplateComponent = computed(() => currentTemplate.value.component)
 const a4TemplateLabel = computed(() => `A4 / ${currentTemplate.value.name}`)
+const paginationDiagnostics = computed<PaginationDiagnostics | null>(() => {
+  if (!diagnosticMode.value || !currentLayout.value || !contentRef.value) return null
+  return buildPaginationDiagnostics({
+    breaks: currentLayout.value.breaks,
+    contentHeight: currentLayout.value.contentHeight,
+    innerTotalHeight: currentLayout.value.innerTotalHeight,
+    firstPageUsableHeight: FIRST_PAGE_USABLE_CONTENT_HEIGHT,
+    regularPageUsableHeight: USABLE_PAGE_CONTENT_HEIGHT,
+    segments: collectPaginationSegments(contentRef.value),
+  })
+})
+const pageDiagnostics = computed(() => paginationDiagnostics.value?.pages ?? [])
+const blankZones = computed(() =>
+  pageDiagnostics.value
+    .filter((page) => page.blankHeight > 16)
+    .map((page) => ({
+      key: `blank-${page.pageNumber}`,
+      top: page.start + page.usedHeight,
+      height: page.blankHeight,
+      label: `留白 ${page.blankHeight}px`,
+      suspicious: page.suspiciousBlank,
+    })),
+)
 
 function waitNextFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
@@ -225,7 +290,12 @@ async function refreshPreviewPageLayout(): Promise<PageLayout | null> {
   pageBreaks.value = layout.breaks
   lastPageSpacerHeight.value = layout.lastPageSpacerHeight
   paperHeight.value = layout.fullPaperHeight
+  currentLayout.value = layout
   return layout
+}
+
+function toggleDiagnosticMode() {
+  diagnosticMode.value = !diagnosticMode.value
 }
 
 function openTemplatePicker() {
@@ -450,6 +520,14 @@ async function exportPDF(mode: ExportQualityMode) {
           <span class="template-trigger-arrow">▾</span>
         </button>
         <span class="a4-badge">{{ a4TemplateLabel }}</span>
+        <button
+          type="button"
+          class="diagnostic-toggle"
+          :class="{ active: diagnosticMode }"
+          @click="toggleDiagnosticMode"
+        >
+          {{ diagnosticMode ? '关闭诊断' : '分页诊断' }}
+        </button>
       </div>
       <div
         ref="exportMenuRef"
@@ -473,6 +551,51 @@ async function exportPDF(mode: ExportQualityMode) {
       </div>
       <div class="export-progress-track">
         <span class="export-progress-fill" :style="{ width: `${exportProgress}%` }"></span>
+      </div>
+    </div>
+
+    <div v-if="diagnosticMode && paginationDiagnostics" class="diagnostic-panel">
+      <div class="diagnostic-summary">
+        <div class="diagnostic-summary-main">
+          <span class="diagnostic-title">分页诊断</span>
+          <span class="diagnostic-summary-text">
+            共 {{ paginationDiagnostics.totalPages }} 页
+            <template v-if="paginationDiagnostics.hasSuspiciousWhitespace">
+              · 检测到 {{ paginationDiagnostics.suspiciousPageCount }} 页留白偏大
+            </template>
+            <template v-else>
+              · 当前留白正常
+            </template>
+          </span>
+        </div>
+        <div class="diagnostic-last-page">
+          末页留白 {{ paginationDiagnostics.lastPageBlankHeight }}px
+          （{{ Math.round(paginationDiagnostics.lastPageBlankRatio * 100) }}%）
+        </div>
+      </div>
+
+      <div class="diagnostic-page-grid">
+        <div
+          v-for="page in pageDiagnostics"
+          :key="`diag-page-${page.pageNumber}`"
+          class="diagnostic-card"
+          :class="{ warn: page.suspiciousBlank }"
+        >
+          <div class="diagnostic-card-head">
+            <span class="diagnostic-card-title">第 {{ page.pageNumber }} 页</span>
+            <span class="diagnostic-card-ratio">使用率 {{ Math.round(page.usageRatio * 100) }}%</span>
+          </div>
+          <div class="diagnostic-card-meta">
+            留白 {{ page.blankHeight }}px
+            <template v-if="page.breakAt !== null">
+              · 断点 {{ page.breakAt }}px
+            </template>
+          </div>
+          <div v-if="page.breakAt !== null" class="diagnostic-card-flow">
+            <div>断点前：{{ page.previousLabel || '未识别到块' }}</div>
+            <div>断点后：{{ page.nextLabel || '未识别到块' }}</div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -503,9 +626,24 @@ async function exportPDF(mode: ExportQualityMode) {
           <div v-if="lastPageSpacerHeight > 0" :style="{ height: `${lastPageSpacerHeight}px` }"></div>
         </div>
 
+        <div
+          v-for="zone in diagnosticMode ? blankZones : []"
+          :key="zone.key"
+          class="diagnostic-blank-zone"
+          :class="{ warn: zone.suspicious }"
+          :style="{ top: `${zone.top}px`, height: `${zone.height}px` }"
+        >
+          <span>{{ zone.label }}</span>
+        </div>
+
         <!-- AI Generated Start -->
         <div v-for="(pos, idx) in pageBreaks" :key="idx" class="page-line" :style="{ top: `${pos}px` }">
-          <span>第{{ idx + 2 }}页</span>
+          <span>
+            第{{ idx + 2 }}页
+            <template v-if="diagnosticMode && pageDiagnostics[idx]">
+              · 上页使用 {{ Math.round(pageDiagnostics[idx]!.usageRatio * 100) }}%
+            </template>
+          </span>
         </div>
         <!-- AI Generated End -->
       </div>
@@ -615,6 +753,24 @@ async function exportPDF(mode: ExportQualityMode) {
   white-space: nowrap;
 }
 
+.diagnostic-toggle {
+  height: 28px;
+  padding: 0 10px;
+  border-radius: 8px;
+  border: 1px solid #d8cabb;
+  background: #fff;
+  color: #6f5d4f;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.diagnostic-toggle.active {
+  border-color: #d97745;
+  background: #fff4ec;
+  color: #b45e33;
+}
+
 .btn-export {
   border: none;
   height: 30px;
@@ -722,6 +878,86 @@ async function exportPDF(mode: ExportQualityMode) {
   transition: width 0.18s ease;
 }
 
+.diagnostic-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 10px;
+  border: 1px solid #e6d8c9;
+  border-radius: 8px;
+  background: #fff9f4;
+}
+
+.diagnostic-summary {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.diagnostic-summary-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.diagnostic-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2d2521;
+}
+
+.diagnostic-summary-text,
+.diagnostic-last-page {
+  font-size: 12px;
+  color: #7b6a5b;
+  line-height: 1.5;
+}
+
+.diagnostic-page-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.diagnostic-card {
+  padding: 10px;
+  border: 1px solid #eadfce;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.diagnostic-card.warn {
+  border-color: #f1c0a6;
+  background: #fff7f2;
+}
+
+.diagnostic-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.diagnostic-card-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #2d2521;
+}
+
+.diagnostic-card-ratio,
+.diagnostic-card-meta {
+  font-size: 11px;
+  color: #8a7461;
+}
+
+.diagnostic-card-flow {
+  margin-top: 8px;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #4a4035;
+}
+
 .preview-scroll {
   flex: 1;
   overflow-y: auto;
@@ -782,5 +1018,38 @@ async function exportPDF(mode: ExportQualityMode) {
   font-weight: 600;
   background: #efe7dc;
   padding: 0 4px;
+}
+
+.diagnostic-blank-zone {
+  position: absolute;
+  left: 12px;
+  right: 12px;
+  border: 1px dashed rgba(217, 119, 69, 0.55);
+  background: rgba(217, 119, 69, 0.08);
+  pointer-events: none;
+  z-index: 1;
+}
+
+.diagnostic-blank-zone.warn {
+  background: rgba(220, 38, 38, 0.08);
+  border-color: rgba(220, 38, 38, 0.45);
+}
+
+.diagnostic-blank-zone span {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9a4e2a;
+  background: rgba(255, 255, 255, 0.86);
+  padding: 2px 6px;
+  border-radius: 999px;
+}
+
+@media (max-width: 1280px) {
+  .diagnostic-summary {
+    flex-direction: column;
+  }
 }
 </style>

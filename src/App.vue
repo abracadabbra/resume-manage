@@ -1,11 +1,18 @@
 ﻿<script setup lang="ts">
-import { ref } from 'vue'
+import { defineAsyncComponent, ref } from 'vue'
 import ModuleSidebar from '@/components/common/ModuleSidebar.vue'
 import EditorPanel from '@/components/resume/EditorPanel.vue'
 import PreviewPanel from '@/components/resume/PreviewPanel.vue'
-import AiInterviewerPanel from '@/components/ai/interview/AiInterviewerPanel.vue'
-import QuestionBankPanel from '@/components/question-bank/QuestionBankPanel.vue'
-import JdSpecialPanel from '@/components/jd-special/JdSpecialPanel.vue'
+
+const AiInterviewerPanel = defineAsyncComponent(
+  () => import('@/components/ai/interview/AiInterviewerPanel.vue'),
+)
+const QuestionBankPanel = defineAsyncComponent(
+  () => import('@/components/question-bank/QuestionBankPanel.vue'),
+)
+const JdSpecialPanel = defineAsyncComponent(
+  () => import('@/components/jd-special/JdSpecialPanel.vue'),
+)
 
 const sidebarCollapsed = ref(false)
 type PrimaryMenuKey = 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special'

@@ -1,4 +1,4 @@
-﻿export function interviewerModeSystemPrompt(jobTitle: string): string {
+export function interviewerModeSystemPrompt(jobTitle: string): string {
   const roleTitle = jobTitle || '技术岗位'
   return [
     `你是一名专业的${roleTitle}资深面试专家，当前扮演候选人。`,

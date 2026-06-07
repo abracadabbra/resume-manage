@@ -1,11 +1,17 @@
 import { defineStore } from 'pinia'
 import { reactive, ref, watch } from 'vue'
 import { normalizeResumeTemplateKey, type ResumeTemplateKey } from '@/templates/resume'
+import {
+  applyResumeData,
+  createResumeDataSnapshot,
+  loadResumeDataFromStorage,
+  saveResumeDataToStorage,
+} from './resumePersistence'
+import { createResumeCloudManager } from './resumeCloud'
 import { 
   signUp, 
   signIn, 
   signOut, 
-  getSession, 
   getResumes, 
   getActiveResume, 
   createResume, 
@@ -37,6 +43,7 @@ export interface BasicInfo {
   line1: string
   line2: string
   line3: string
+  line4: string
 }
 
 export interface EducationEntry {
@@ -140,6 +147,7 @@ export const useResumeStore = defineStore('resume', () => {
     line1: '',
     line2: '',
     line3: '',
+    line4: '',
   })
 
   const educationList = reactive<EducationEntry[]>([
@@ -195,6 +203,18 @@ export const useResumeStore = defineStore('resume', () => {
   const lastSavedAt = ref<number | null>(null)
   const lastSaveMode = ref<'auto' | 'manual' | null>(null)
   const isSaving = ref(false)
+  const resumeState = {
+    modules,
+    selectedTemplateKey,
+    basicInfo,
+    educationList,
+    skills,
+    certificate,
+    workList,
+    projectList,
+    awardList,
+    selfIntro,
+  }
 
   function toggleModule(key: string) {
     const mod = modules.find((m) => m.key === key)
@@ -326,6 +346,21 @@ export const useResumeStore = defineStore('resume', () => {
     if (idx > -1) projectList.splice(idx, 1)
   }
 
+  function canMoveProject(id: string, direction: 'up' | 'down'): boolean {
+    const idx = projectList.findIndex((e) => e.id === id)
+    if (idx < 0) return false
+    if (direction === 'up') return idx > 0
+    return idx < projectList.length - 1
+  }
+
+  function moveProject(id: string, direction: 'up' | 'down') {
+    if (!canMoveProject(id, direction)) return
+    const idx = projectList.findIndex((e) => e.id === id)
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1
+    const [item] = projectList.splice(idx, 1)
+    if (item) projectList.splice(targetIdx, 0, item)
+  }
+
   function addAward() {
     awardList.push({
       id: genId(),
@@ -349,150 +384,40 @@ export const useResumeStore = defineStore('resume', () => {
   const currentResumeId = ref<string | null>(null)
   const resumeVersions = ref<ResumeRecord[]>([])
 
-  async function login(email: string, password: string) {
-    const { data, error } = await signIn(email, password)
-    if (error) throw error
-    if (data?.user) {
-      userId.value = data.user.id
-      isLoggedIn.value = true
-      await loadResumes()
-    }
-  }
-
-  async function register(email: string, password: string) {
-    const { data, error } = await signUp(email, password)
-    if (error) throw error
-    if (data?.user) {
-      userId.value = data.user.id
-      isLoggedIn.value = true
-    }
-  }
-
-  async function logout() {
-    await signOut()
-    userId.value = null
-    isLoggedIn.value = false
-    currentResumeId.value = null
-    resumeVersions.value = []
-  }
-
-  async function loadResumes() {
-    if (!userId.value) return
-    resumeVersions.value = await getResumes(userId.value)
-    const active = await getActiveResume(userId.value)
-    if (active) {
-      currentResumeId.value = active.id
-      loadData(active.data)
-    }
-  }
-
-  async function saveToCloud(name?: string) {
-    if (!userId.value) {
-      throw new Error('Not logged in')
-    }
-    const data = getData()
-    if (currentResumeId.value) {
-      await updateResume(currentResumeId.value, data)
-    } else if (name) {
-      const resume = await createResume(userId.value, name, data)
-      currentResumeId.value = resume.id
-    }
-    await loadResumes()
-  }
-
-  async function createNewVersion(name: string) {
-    if (!userId.value) {
-      throw new Error('Not logged in')
-    }
-    const data = getData()
-    const resume = await createResume(userId.value, name, data)
-    currentResumeId.value = resume.id
-    await loadResumes()
-  }
-
-  async function switchVersion(resumeId: string) {
-    if (!userId.value) return
-    await setActiveResume(userId.value, resumeId)
-    currentResumeId.value = resumeId
-    await loadResumes()
-  }
-
-  async function removeVersion(resumeId: string) {
-    await deleteResume(resumeId)
-    if (currentResumeId.value === resumeId) {
-      currentResumeId.value = null
-    }
-    await loadResumes()
-  }
-
   function getData() {
-    return {
-      modules: modules.map((m) => ({ ...m })),
-      selectedTemplateKey: selectedTemplateKey.value,
-      basicInfo: { ...basicInfo },
-      educationList: educationList.map((e) => ({ ...e })),
-      skills: skills.value,
-      certificate: certificate.value,
-      workList: workList.map((w) => ({ ...w })),
-      projectList: projectList.map((p) => ({ ...p })),
-      awardList: awardList.map((a) => ({ ...a })),
-      selfIntro: selfIntro.value,
-    }
+    return createResumeDataSnapshot(resumeState)
   }
 
-  function loadData(data: any) {
+  function loadData(data: unknown) {
     if (!data) return
     try {
-      if (data.modules) {
-        const byKey = new Map<string, ModuleConfig>()
-        ;(data.modules as ModuleConfig[]).forEach((m) => {
-          if (m?.key) byKey.set(m.key, m)
-        })
-
-        const orderedKeys = [
-          'basicInfo',
-          ...(data.modules as ModuleConfig[]).map((m) => m.key).filter((key) => key && key !== 'basicInfo'),
-        ]
-
-        const seen = new Set<string>()
-        const nextModules: ModuleConfig[] = []
-
-        orderedKeys.forEach((key) => {
-          if (seen.has(key)) return
-          seen.add(key)
-          const fallback = modules.find((m) => m.key === key)
-          if (!fallback) return
-          nextModules.push({ ...fallback, ...byKey.get(key) })
-        })
-
-        modules.forEach((m) => {
-          if (seen.has(m.key)) return
-          nextModules.push({ ...m, ...byKey.get(m.key) })
-        })
-
-        modules.splice(0, modules.length, ...nextModules)
-      }
-      selectedTemplateKey.value = normalizeResumeTemplateKey(data.selectedTemplateKey ?? data.selectedTemplateId)
-      if (data.basicInfo) Object.assign(basicInfo, data.basicInfo)
-      if (data.educationList) {
-        educationList.splice(0, educationList.length, ...data.educationList)
-      }
-      if (data.skills !== undefined) skills.value = data.skills
-      if (data.certificate !== undefined) certificate.value = data.certificate
-      if (data.workList) {
-        workList.splice(0, workList.length, ...data.workList)
-      }
-      if (data.projectList) {
-        projectList.splice(0, projectList.length, ...data.projectList)
-      }
-      if (data.awardList) {
-        awardList.splice(0, awardList.length, ...data.awardList)
-      }
-      if (data.selfIntro !== undefined) selfIntro.value = data.selfIntro
+      applyResumeData(resumeState, data, normalizeResumeTemplateKey)
     } catch (e) {
       console.warn('Failed to load resume data', e)
     }
   }
+
+  const cloudManager = createResumeCloudManager({
+    api: {
+      signUp,
+      signIn,
+      signOut,
+      getResumes,
+      getActiveResume,
+      createResume,
+      updateResume,
+      setActiveResume,
+      deleteResume,
+    },
+    state: {
+      isLoggedIn,
+      userId,
+      currentResumeId,
+      resumeVersions,
+    },
+    getData,
+    loadData,
+  })
 
   let saveLoadingTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -511,78 +436,19 @@ export const useResumeStore = defineStore('resume', () => {
       saveTimer = null
     }
     markSavingState()
-    const data = {
-      modules: modules.map((m) => ({ ...m })),
-      selectedTemplateKey: selectedTemplateKey.value,
-      basicInfo: { ...basicInfo },
-      educationList: educationList.map((e) => ({ ...e })),
-      skills: skills.value,
-      certificate: certificate.value,
-      workList: workList.map((w) => ({ ...w })),
-      projectList: projectList.map((p) => ({ ...p })),
-      awardList: awardList.map((a) => ({ ...a })),
-      selfIntro: selfIntro.value,
-    }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data))
+    saveResumeDataToStorage(localStorage, STORAGE_KEY, getData())
     nextAutoSaveAt.value = null
     lastSavedAt.value = Date.now()
     lastSaveMode.value = mode
   }
 
   function loadFromStorage() {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (!raw) return
-    try {
-      const data = JSON.parse(raw)
-      if (data.modules) {
-        const byKey = new Map<string, ModuleConfig>()
-        ;(data.modules as ModuleConfig[]).forEach((m) => {
-          if (m?.key) byKey.set(m.key, m)
-        })
-
-        const orderedKeys = [
-          'basicInfo',
-          ...(data.modules as ModuleConfig[]).map((m) => m.key).filter((key) => key && key !== 'basicInfo'),
-        ]
-
-        const seen = new Set<string>()
-        const nextModules: ModuleConfig[] = []
-
-        orderedKeys.forEach((key) => {
-          if (seen.has(key)) return
-          seen.add(key)
-          const fallback = modules.find((m) => m.key === key)
-          if (!fallback) return
-          nextModules.push({ ...fallback, ...byKey.get(key) })
-        })
-
-        modules.forEach((m) => {
-          if (seen.has(m.key)) return
-          nextModules.push({ ...m, ...byKey.get(m.key) })
-        })
-
-        modules.splice(0, modules.length, ...nextModules)
-      }
-      selectedTemplateKey.value = normalizeResumeTemplateKey(data.selectedTemplateKey ?? data.selectedTemplateId)
-      if (data.basicInfo) Object.assign(basicInfo, data.basicInfo)
-      if (data.educationList) {
-        educationList.splice(0, educationList.length, ...data.educationList)
-      }
-      if (data.skills !== undefined) skills.value = data.skills
-      if (data.certificate !== undefined) certificate.value = data.certificate
-      if (data.workList) {
-        workList.splice(0, workList.length, ...data.workList)
-      }
-      if (data.projectList) {
-        projectList.splice(0, projectList.length, ...data.projectList)
-      }
-      if (data.awardList) {
-        awardList.splice(0, awardList.length, ...data.awardList)
-      }
-      if (data.selfIntro !== undefined) selfIntro.value = data.selfIntro
-    } catch (e) {
-      console.warn('Failed to load resume data from localStorage', e)
+    const { data, error } = loadResumeDataFromStorage(localStorage, STORAGE_KEY)
+    if (error) {
+      console.warn('Failed to load resume data from localStorage', error)
+      return
     }
+    loadData(data)
   }
 
   loadFromStorage()
@@ -636,10 +502,11 @@ export const useResumeStore = defineStore('resume', () => {
     removeWork,
     addProject,
     removeProject,
+    canMoveProject,
+    moveProject,
     addAward,
     removeAward,
     saveToStorage,
-    saveToCloud,
     autoSaveDelayMs: AUTO_SAVE_DELAY_MS,
     nextAutoSaveAt,
     lastSavedAt,
@@ -649,11 +516,13 @@ export const useResumeStore = defineStore('resume', () => {
     userId,
     currentResumeId,
     resumeVersions,
-    login,
-    register,
-    logout,
-    createNewVersion,
-    switchVersion,
-    removeVersion,
+    getSnapshot: getData,
+    login: cloudManager.login,
+    register: cloudManager.register,
+    logout: cloudManager.logout,
+    createNewVersion: cloudManager.createNewVersion,
+    switchVersion: cloudManager.switchVersion,
+    removeVersion: cloudManager.removeVersion,
+    saveToCloud: cloudManager.saveToCloud,
   }
 })

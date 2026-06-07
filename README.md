@@ -229,6 +229,37 @@ npm run format
 - 如使用邮箱注册，需在 Supabase 后台 **Authentication → Providers** 中开启 **Email** 登录
 - 免费额度足够个人使用
 
+## 题库云同步
+
+面试题库支持把“自定义/AI 生成题、我的回答、练习备注、掌握状态、AI 点评”同步到云端。登录后在面试题库顶部点击“拉取”或“上传”即可手动同步。
+
+### Supabase 表结构
+
+需要在 Supabase SQL Editor 中创建 `question_bank_states` 表：
+
+```sql
+create table if not exists question_bank_states (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+
+alter table question_bank_states enable row level security;
+
+create policy "Users can read own question bank"
+on question_bank_states for select
+using (auth.uid() = user_id);
+
+create policy "Users can insert own question bank"
+on question_bank_states for insert
+with check (auth.uid() = user_id);
+
+create policy "Users can update own question bank"
+on question_bank_states for update
+using (auth.uid() = user_id)
+with check (auth.uid() = user_id);
+```
+
 ## 项目结构
 
 ```text

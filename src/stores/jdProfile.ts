@@ -23,6 +23,7 @@ export interface JdProfile {
 }
 
 const STORAGE_KEY = 'jd-profiles'
+let jdQuestionIdCounter = 0
 
 function loadProfiles(): JdProfile[] {
   try {
@@ -39,6 +40,11 @@ function saveProfiles(profiles: JdProfile[]) {
   } catch {
     // ignore
   }
+}
+
+function createJdQuestionId(): string {
+  jdQuestionIdCounter += 1
+  return `jdq_${Date.now()}_${jdQuestionIdCounter}`
 }
 
 function buildDefaultProfile(): JdProfile {
@@ -130,10 +136,27 @@ export const useJdProfileStore = defineStore('jdProfile', () => {
     if (!profile) return
     profile.questions.push({
       ...question,
-      id: `jdq_${Date.now()}`,
+      id: createJdQuestionId(),
       jdId,
     })
     saveProfiles(profiles.value)
+  }
+
+  function addQuestions(
+    jdId: string,
+    questions: Array<Omit<JdQuestion, 'id' | 'jdId'>>,
+  ) {
+    const profile = profiles.value.find((p) => p.id === jdId)
+    if (!profile) return []
+
+    const created = questions.map((question) => ({
+      ...question,
+      id: createJdQuestionId(),
+      jdId,
+    }))
+    profile.questions.push(...created)
+    saveProfiles(profiles.value)
+    return created
   }
 
   function deleteQuestion(jdId: string, questionId: string) {
@@ -167,6 +190,7 @@ export const useJdProfileStore = defineStore('jdProfile', () => {
     addProfile,
     deleteProfile,
     addQuestion,
+    addQuestions,
     deleteQuestion,
     updateProfileName,
   }

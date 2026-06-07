@@ -1,5 +1,5 @@
 ﻿<script setup lang="ts">
-import { computed, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
+import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
 import { useResumeStore } from '@/stores/resume'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import BasicInfoEditor from './editors/BasicInfoEditor.vue'
@@ -10,9 +10,10 @@ import WorkExperienceEditor from './editors/WorkExperienceEditor.vue'
 import ProjectExperienceEditor from './editors/ProjectExperienceEditor.vue'
 import AwardsEditor from './editors/AwardsEditor.vue'
 import SelfIntroEditor from './editors/SelfIntroEditor.vue'
-import AiConfigDialog from '@/components/ai/AiConfigDialog.vue'
-import AiOptimizePanel from '@/components/ai/AiOptimizePanel.vue'
 import { getModuleIconPaths, MODULE_ICON_VIEWBOX } from '@/constants/moduleIcons'
+
+const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
+const AiOptimizePanel = defineAsyncComponent(() => import('@/components/ai/AiOptimizePanel.vue'))
 
 const store = useResumeStore()
 const aiConfig = useAiConfigStore()

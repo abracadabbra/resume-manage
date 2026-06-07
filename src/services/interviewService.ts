@@ -1,4 +1,4 @@
-﻿import type { AiConfig } from '@/stores/aiConfig'
+import type { AiConfig } from '@/stores/aiConfig'
 import type { BasicInfo, EducationEntry, ProjectEntry, WorkEntry } from '@/stores/resume'
 import { candidateModeSystemPrompt } from '@/services/prompts/interviewCandidatePrompt'
 import { interviewerModeSystemPrompt } from '@/services/prompts/interviewInterviewerPrompt'
@@ -107,7 +107,7 @@ function normalizeMemorySummaryText(content: string): string {
   return truncateText(content.replace(/\s+/g, ' ').trim(), 600)
 }
 
-function buildResumeDigest(snapshot: ResumeSnapshot, mode: 'full' | 'compact' = 'full'): string {
+export function buildResumeDigest(snapshot: ResumeSnapshot, mode: 'full' | 'compact' = 'full'): string {
   const isCompact = mode === 'compact'
   const basicInfo = snapshot.basicInfo
   const basic: string[] = []
@@ -534,4 +534,3 @@ export async function requestInterviewTurn(
   callbacks?.onAssistantReplyChunk?.(normalized.assistantReply)
   return normalized
 }
-

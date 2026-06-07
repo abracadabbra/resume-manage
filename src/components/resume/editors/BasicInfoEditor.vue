@@ -86,6 +86,10 @@ function removeAvatar() {
           <label class="form-label">头部信息（第3行）</label>
           <input v-model="store.basicInfo.line3" type="text" class="form-input" placeholder="例如：E类人才 · 政采云评审专家 · 浙江省工程师学会会员" />
         </div>
+        <div class="form-group">
+          <label class="form-label">头部信息（第4行）</label>
+          <input v-model="store.basicInfo.line4" type="text" class="form-input" placeholder="例如：可选" />
+        </div>
       </div>
 
       <!-- Row 2: Avatar, Age, Gender -->

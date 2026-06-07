@@ -1,0 +1,2448 @@
+{
+  "chapters": [
+    {
+      "id": "ch1",
+      "name": "Java 基础 & 并发",
+      "shortName": "Java并发",
+      "order": 1,
+      "questionCount": 8
+    },
+    {
+      "id": "ch2",
+      "name": "JVM",
+      "shortName": "JVM",
+      "order": 2,
+      "questionCount": 7
+    },
+    {
+      "id": "ch3",
+      "name": "Spring & 框架",
+      "shortName": "Spring",
+      "order": 3,
+      "questionCount": 9
+    },
+    {
+      "id": "ch4",
+      "name": "数据库 & 缓存",
+      "shortName": "数据库",
+      "order": 4,
+      "questionCount": 12
+    },
+    {
+      "id": "ch5",
+      "name": "消息队列",
+      "shortName": "MQ",
+      "order": 5,
+      "questionCount": 5
+    },
+    {
+      "id": "ch6",
+      "name": "大数据",
+      "shortName": "大数据",
+      "order": 6,
+      "questionCount": 6
+    },
+    {
+      "id": "ch7",
+      "name": "项目深挖 — 风控系统",
+      "shortName": "风控系统",
+      "order": 7,
+      "questionCount": 7
+    },
+    {
+      "id": "ch8",
+      "name": "项目深挖 — 毛利系统",
+      "shortName": "毛利系统",
+      "order": 8,
+      "questionCount": 4
+    },
+    {
+      "id": "ch9",
+      "name": "项目深挖 — 算法工程平台",
+      "shortName": "算法平台",
+      "order": 9,
+      "questionCount": 3
+    },
+    {
+      "id": "ch10",
+      "name": "系统设计",
+      "shortName": "系统设计",
+      "order": 10,
+      "questionCount": 4
+    },
+    {
+      "id": "ch11",
+      "name": "AI 应用",
+      "shortName": "AI应用",
+      "order": 11,
+      "questionCount": 3
+    },
+    {
+      "id": "ch12",
+      "name": "架构 & 设计原则",
+      "shortName": "架构设计",
+      "order": 12,
+      "questionCount": 5
+    },
+    {
+      "id": "ch13",
+      "name": "团队 & 软技能",
+      "shortName": "团队管理",
+      "order": 13,
+      "questionCount": 3
+    },
+    {
+      "id": "ch14",
+      "name": "开放问题",
+      "shortName": "开放问题",
+      "order": 14,
+      "questionCount": 4
+    },
+    {
+      "id": "ch15",
+      "name": "JD专项准备",
+      "shortName": "JD专项",
+      "order": 15,
+      "questionCount": 10
+    }
+  ],
+  "questions": [
+    {
+      "id": "ch1_q1",
+      "chapterId": "ch1",
+      "number": 1,
+      "title": "线程池的核心参数有哪些？拒绝策略什么时候触发？",
+      "difficulty": "basic",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "核心参数：\n• corePoolSize：核心线程数\n• maximumPoolSize：最大线程数\n• keepAliveTime：空闲线程存活时间\n• unit：时间单位\n• workQueue：任务队列\n• threadFactory：线程工厂\n• handler：拒绝策略\n\n触发时机（任务提交流程）：\n1. 核心线程未满 → 创建核心线程执行\n2. 核心线程已满，队列未满 → 入队等待\n3. 队列已满，最大线程未满 → 创建临时线程执行\n4. 最大线程已满 → 执行拒绝策略\n\n四种拒绝策略：\n• AbortPolicy：抛RejectedExecutionException（默认）\n• CallerRunsPolicy：由调用方线程执行\n• DiscardPolicy：直接丢弃\n• DiscardOldestPolicy：丢弃队列最旧的任务",
+        "followUp": [
+          {
+            "question": "你们风控系统的线程池怎么配置的？coreSize 和 maxSize 分别是多少？",
+            "answer": "风控系统线程池配置策略：根据CPU核心数和业务特性综合评估。核心线程数设为CPU核心数的2倍（16核机器配32个核心线程），最大线程数设为核心数的4倍。队列容量根据峰值QPS和任务平均耗时计算，确保正常流量走核心线程，突发流量入队，队列满才扩容到最大线程数。核心线程保活时间设为60秒，避免频繁创建销毁线程。拒绝策略选用CallerRunsPolicy，让调用方线程执行任务，防止任务丢失。实际配置示例：corePoolSize=32, maxPoolSize=64, queueCapacity=2000，适用于日均千万级请求的风控场景。"
+          },
+          {
+            "question": "为什么用 LinkedBlockingQueue 而不是 SynchronousQueue？",
+            "answer": "ArrayBlockingQueue用有界数组实现，生产者put()时队列满会阻塞，消费者take()时队列空会阻塞。LinkedBlockingQueue用链表实现，默认无界（Integer.MAX_VALUE），但可以设置容量控制内存使用。"
+          },
+          {
+            "question": "线程池的线程怎么保活的？keepAliveTime 设置多少？",
+            "answer": "线程池保活机制通过keepAliveTime控制空闲线程存活时间。非核心线程空闲超过keepAliveTime后会被销毁，释放资源。核心线程默认永久保活，但可通过allowCoreThreadTimeOut(true)让核心线程也参与超时回收。保活时间设置策略：IO密集型任务设长一些（60-120秒），让线程保持等待状态避免频繁创建；CPU密集型任务设短一些（10-30秒），因为线程本来就该忙着计算。生产环境设置60秒是个经验值，在资源占用和响应速度间取得平衡。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q2",
+      "chapterId": "ch1",
+      "number": 2,
+      "title": "线程池是怎么保活的？核心线程会超时销毁吗？",
+      "difficulty": "basic",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "默认情况下：\n• 核心线程永久存活，不会被回收\n• 只有非核心线程空闲时间超过 keepAliveTime 才会被销毁\n\nallowCoreThreadTimeOut = true 时：\n• 核心线程也会超时销毁\n• 适用于线程池负载不均匀、想节省资源的场景\n\n保活机制：\n• 线程池会维护一个 set 来记录哪些线程是空闲的\n• 每次 worker 线程取任务时更新 lastExecutionTime\n• keepAliveTime 到期后，空闲线程被移出工作集并终止",
+        "followUp": [
+          {
+            "question": "你们实际项目中设置过 allowCoreThreadTimeOut 吗？为什么？",
+            "answer": "这涉及到系统设计的核心权衡。以线程池为例，核心参数（corePoolSize、maxPoolSize、queueCapacity）需要根据业务负载特点（CPU密集/IO密集）、峰值QPS、平均耗时来综合计算，确保性能最优且资源可控。"
+          },
+          {
+            "question": "线程池的线程数和机器 CPU 核心数怎么换算？",
+            "answer": "线程数设置公式：CPU密集型=核心数+1，IO密集型=核心数*2~4。计算方法：先确定核心线程数=CPU核心数*2（经验值），然后根据队列容量和最大线程数设置最大线程数=核心线程数*2，最后根据任务特性调整。举例：8核CPU，IO密集型任务（平均耗时200ms），峰值QPS=1000，则核心线程数=8*2=16，最大线程数=16*2=32。关键指标监控：线程活跃度（activeCount/maxPoolSize）应保持在40%-70%，过低说明线程浪费，过高说明需要扩容。"
+          },
+          {
+            "question": "你们生产环境线程池是怎么配置的？",
+            "answer": "生产环境线程池配置示例：核心线程8个，最大线程32个，队列容量1000。配置思路：正常流量由8个核心线程处理，突发流量进入队列排队，队列满了才扩容到32个线程。超过32个线程则触发拒绝策略。监控指标：核心线程活跃度应长期低于70%，否则需要扩容。队列积压量超过500就要告警。实际项目中还配置了线程池监控：记录任务执行时间分布（TP50/TP99）、队列等待时间、线程创建失败次数，便于容量规划和调优。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q3",
+      "chapterId": "ch1",
+      "number": 3,
+      "title": "synchronized 和 ReentrantLock 的区别？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "对比维度 | synchronized | ReentrantLock\n---|---|---\n实现层次 | JVM 内置关键字 | JDK 层面实现（java.util.concurrent）\n等待可中断 | 不可中断，synchronized 不支持超时 | 可中断，支持 tryLock(long time, TimeUnit unit)\n公平锁 | 非公平锁，无法实现公平 | 可选公平/非公平，通过构造函数传入 fair=true\n锁绑定条件 | 只能绑定一个条件（this） | 可绑定多个 Condition，分组唤醒线程\n锁释放 | 自动释放（代码块结束） | 必须手动 unlock()，需放在 finally 中\n锁状态 | 不可判断 | 可通过 isHeldByCurrentThread() 判断\n\nsynchronized 的锁升级过程：\n偏向锁 → 轻量级锁 → 重量级锁\n\n偏向锁：对象头Mark Word记录线程ID，同一线程多次获取无需同步\n轻量级锁：线程在用户态自旋 CAS 争抢，避免阻塞\n重量级锁：自旋失败后膨胀为OS互斥量，线程进入阻塞状态",
+        "followUp": [
+          {
+            "question": "synchronized 锁升级过程？偏向锁 → 轻量级锁 → 重量级锁",
+            "answer": "synchronized锁升级过程分为三个阶段：偏向锁→轻量级锁→重量级锁。偏向锁阶段：对象头Mark Word记录获取锁的线程ID，同一线程再次获取锁只需检查Mark Word，无需同步开销。适用场景：单线程反复获取同一把锁。当有其他线程尝试获取锁时，偏向锁升级为轻量级锁。轻量级锁阶段：线程在用户态通过CAS自旋争抢锁，自旋失败超过阈值（默认10次）后膨胀为重量级锁。重量级锁阶段：线程被阻塞，涉及操作系统内核态切换，开销较大但不会空耗CPU。JDK 1.6默认启用偏向锁，可通过-XX:-UseBiasedLocking=false禁用。"
+          },
+          {
+            "question": "偏向锁的撤销条件？",
+            "answer": "偏向锁撤销发生在其他线程尝试获取已被偏向的锁时。具体条件：1）其他线程执行synchronized时，发现对象头偏向的线程不存活或不在同步块中；2）调用Object.hashCode()或System.identityHashCode()会导致偏向锁撤销，因为这些方法需要获取对象Hash值；3）偏向锁撤销需要在安全点（Safe Point）进行，JVM需要停止所有线程，导致停顿。性能影响：偏向锁设计用于消除同步开销，但在锁竞争激烈的场景下，频繁的撤销反而影响性能。生产环境建议：并发度高的场景禁用偏向锁（-XX:-UseBiasedLocking=false），让系统直接从轻量级锁开始。"
+          },
+          {
+            "question": "轻量级锁在什么情况下会膨胀成重量级锁？",
+            "answer": "轻量级锁膨胀为重量级锁的条件：1）自旋次数超过阈值（默认10次，可通过-XX:PreBlockSpin调整）；2）持有轻量级锁的线程在自旋过程中阻塞了其他线程；3）JVM检测到多个线程在轻度竞争。膨胀过程：撤销轻量级锁，升级为ObjectMonitor（重量级锁的内部实现），等待锁的线程被阻塞。优化建议：JDK 1.6后引入自适应自旋（Adaptive Spinning），根据历史自旋成功次数动态调整自旋次数，高竞争场景自动减少自旋。生产环境遇到高并发锁竞争时，可考虑减少锁粒度（ConcurrentHashMap分段锁思想）或使用ReentrantLock替代synchronized。"
+          },
+          {
+            "question": "ReentrantLock 的实现原理？",
+            "answer": "ReentrantLock基于AQS（AbstractQueuedSynchronizer）实现，核心是CLH队列和CAS操作。AQS维护一个volatile的state变量表示锁状态，0表示无锁，大于0表示有线程持有锁且重入次数。获取锁时通过CAS尝试将state从0改为1，成功则获取锁；失败则加入等待队列。等待队列是双向链表，每个节点记录线程引用和状态。释放锁时state减1，归0时唤醒队列中下一个等待线程。公平锁实现：tryAcquire时会检查队列中是否有更早的等待线程，有则排队；非公平锁实现：直接尝试CAS抢锁，可能存在插队。ReentrantLock支持可重入，state记录重入次数，释放时需要完全释放才能让其他线程获取。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q4",
+      "chapterId": "ch1",
+      "number": 4,
+      "title": "volatile 解决了什么问题？不能解决什么问题？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握",
+        "高频追问"
+      ],
+      "answer": {
+        "content": "volatile 能做到：\n1. 可见性：写操作立即刷新到主内存，后续读操作直接从主内存读取\n2. 禁止指令重排序：通过内存屏障（Memory Barrier）实现\n\nvolatile 不能做到：\n• 原子性：i++ 这种 read-modify-write 操作不是原子的\n\n经典追问：\n```java\npublic class Counter {\n    private volatile int count = 0;\n    public void increment() {\n        count++;  // 非原子操作！\n    }\n}\n```\n这里 volatile 能保证线程安全吗？\n答：不能！count++ 实际是三个操作：\n1. 读取 count 到寄存器\n2. 寄存器 +1\n3. 写回主内存\nvolatile 只保证可见性，不保证原子性。需要用 synchronized 或 AtomicInteger。",
+        "followUp": [
+          {
+            "question": "volatile 能保证线程安全吗？为什么？",
+            "answer": "这个问题考察的是volatile 解决了什么问题？不能解决什么问题？相关的深度理解。volatile不能保证线程安全。i++操作包含读取、修改、写入三步，volatile只保证可见性，不保证原子性。需要用synchronized或AtomicInteger等原子类来保证原子性。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "i++ 是原子操作吗？",
+            "answer": "这个问题考察的是volatile 解决了什么问题？不能解决什么问题？相关的深度理解。是的，这是正确的理解。这个机制在生产环境中广泛应用，能够有效解决对应的技术问题。但需要注意具体实现的细节和边界条件，确保在所有场景下都能正常工作。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "什么场景下用 volatile 就够了？",
+            "answer": "这个问题考察的是volatile 解决了什么问题？不能解决什么问题？相关的深度理解。volatile适用于以下场景：1）boolean标记位；2）双重检查锁定（DCL）中的单例变量；3）配合CAS实现乐观锁。只要变量赋值和读取是原子操作，volatile就够用。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q5",
+      "chapterId": "ch1",
+      "number": 5,
+      "title": "ConcurrentHashMap 的实现原理？JDK1.7 和 1.8 的区别？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "JDK 1.7：\n• 采用 Segment 分段锁，每个 Segment 内部是 HashEntry 数组\n• 默认 16 个锁（Segments 数组大小），减少锁竞争\n• 并发度由 Segment 数量决定\n\nJDK 1.8：\n• 去掉分段锁，改用 CAS + synchronized\n• synchronized 只锁住当前 bucket 的头节点（红黑树根节点）\n• 锁粒度更细，并发性能更高\n• 数据结构：数组 + 链表 + 红黑树（链表长度超过 8 转为红黑树）\n\n为什么链表转红黑树是 8 而不是 7 或 9？\n• 统计学的结论：hash 碰撞后链表长度遵循泊松分布\n• 当长度 >= 8 时概率已经很小（0.00000006），此时红黑树查询优势明显\n• 8 是时间和空间成本的平衡点\n\nsize() 方法实现：\n• JDK 1.7：先尝试不加锁计算两次，如果结果不同则加锁重试\n• JDK 1.8：使用 CounterCell 数组记录每个桶的计数增量，最后求和",
+        "followUp": [
+          {
+            "question": "链表转红黑树为什么是 8？不是 7 或 9？",
+            "answer": "这个问题考察的是ConcurrentHashMap 的实现原理？JDK1.7 和 1.8 的区别？相关的深度理解。链表转红黑树的阈值8是统计学结论。当hash碰撞导致链表长度达到8时，概率已极小（泊松分布），此时红黑树的O(log n)查找优势明显优于链表的O(n)。8是时间和空间成本的平衡点。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "size() 方法是怎么实现的？ConcurrentHashMap 怎么保证并发情况下计数准确？",
+            "answer": "这个问题考察的是ConcurrentHashMap 的实现原理？JDK1.7 和 1.8 的区别？相关的深度理解。JDK8中size()使用CounterCell数组记录每个桶的计数增量，避免了JDK7中先不加锁计算两次再锁重试的开销。最终对所有CounterCell求和得到准确计数。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "JDK 1.8 的 synchronized 比 1.7 的分段锁好在哪？",
+            "answer": "JDK1.7的分段锁最大问题在于：全局锁的粒度仍然较粗，且Segments数组大小固定（默认16），并发度无法动态扩展。JDK1.8用CAS+synchronized实现：添加元素时先用CAS尝试写入头节点，写入失败或发现hash冲突才用synchronized锁住头节点。锁粒度细化到每个bucket的头节点，而不是整段。对于读操作，大多数情况只用CAS不需要锁。synchronized在JDK1.8中做了很多优化：锁膨胀不在每次进入同步块时发生而是自旋失败后才膨胀；偏向锁在无竞争情况下几乎零开销；轻量级锁使用栈帧中的Lock Record，避免了重量级锁的ObjectMonitor开销。综合下来JDK1.8的并发性能提升约30%-50%。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q6",
+      "chapterId": "ch1",
+      "number": 6,
+      "title": "ThreadLocal 有什么用？有什么坑？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "核心作用：\n• 每个线程有独立的变量副本，线程间隔离\n• 典型用途：数据库连接上下文、用户会话信息、TranceID 传递\n\n常见坑：\n\n1. 内存泄漏\n   • ThreadLocalMap 的 Entry 继承 WeakReference<ThreadLocal<?>>\n   • 但 Value 是强引用！\n   • 线程复用场景（线程池）：线程生命周期长，ThreadLocal 对象被回收后，Value 仍被 Entry 引用，导致内存泄漏\n   • 解决：在线程池使用完 ThreadLocal 后，显式调用 remove()\n\n2. 父子线程传递\n   • InheritableThreadLocal 可以传递子线程\n   • 但线程池场景下，子线程拿不到主线程的值（因为线程是复用的，不是新建的）\n   • 解决：用 TransmittableThreadLocal（阿里开源）或手动传递\n\n为什么 Entry 用弱引用？\n• 如果用强引用，ThreadLocal 对象永远不会被 GC，导致内存泄漏\n• 用弱引用，ThreadLocal 对象可以被 GC 回收，但 Value 仍可能泄漏",
+        "followUp": [
+          {
+            "question": "内存泄漏的场景能具体说下吗？",
+            "answer": "内存泄漏发生在线程复用场景。ThreadLocalMap的Entry继承WeakReference，但Value是强引用。当ThreadLocal对象被GC后，Entry.key变为null，但Value仍被Entry引用，导致内存泄漏。应在finally中显式调用remove()。"
+          },
+          {
+            "question": "线程池中怎么正确使用 ThreadLocal？",
+            "answer": "ThreadLocal在线程池中使用必须养成两个习惯：1）set后必须调用remove()，而且要放在finally中确保即使抛异常也清理。2）优先使用父线程传递的方式（InheritableThreadLocal），但注意线程池复用的线程无法从主线程继承值。生产环境推荐方案：请求进入时set，用Filter拦截，finally中remove。或者封装为一个工具类，在finally中自动清理。更稳妥的方式是避免在ThreadLocal中存储大对象，只存轻量数据如traceId、userId等。阿里开源的TransmittableThreadLocal可以解决线程池复用场景下的值传递问题，内部维护了一个线程变量快照。"
+          },
+          {
+            "question": "为什么要用弱引用？",
+            "answer": "这个问题考察的是ThreadLocal 有什么用？有什么坑？相关的深度理解。Entry用弱引用是为了解决ThreadLocal对象本身的内存泄漏问题。如果用强引用，ThreadLocal永远不会被GC。但Value仍可能泄漏，因为线程生命周期长，Value无法被回收。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "InheritableThreadLocal 和 TransmittableThreadLocal 的区别？",
+            "answer": "InheritableThreadLocal只适用于父子线程场景，且线程池复用时子线程拿不到主线程的值。TransmittableThreadLocal通过装饰线程池，在任务提交前捕获父线程的值并传递给子线程，解决了线程池场景下的传递问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q7",
+      "chapterId": "ch1",
+      "number": 7,
+      "title": "CompletableFuture 和传统 Future 的区别？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "Future 的局限：\n• 不能手动完成（无法提前设置结果）\n• 不能链式调用（多个依赖操作难以编排）\n• 不能合并多个 Future\n• 阻塞式获取结果（get()）\n\nCompletableFuture 的优势：\n\n1. 回调式编程（非阻塞）\n   • thenApply()：转换结果\n   • thenAccept()：消费结果\n   • thenCompose()：扁平化嵌套 Future\n\n2. 组合能力\n   • allOf()：等待所有 Future 完成\n   • anyOf()：任意一个 Future 完成即可\n\n3. 异常处理\n   • exceptionally()：异常时的回调\n   • handle()：无论正常异常都处理\n\n4. 手动完成\n   • complete()：主动完成\n   • completeExceptionally()：主动抛异常\n\n生产使用示例：\n```java\nCompletableFuture.supplyAsync(() -> queryDB())\n    .thenApply(this::processData)\n    .thenCompose(data -> CompletableFuture.supplyAsync(() -> callAPI(data)))\n    .exceptionally(ex -> {\n        log.error(\"执行失败\", ex);\n        return fallbackData;\n    })\n    .thenAccept(result -> updateUI(result));\n```",
+        "followUp": [
+          {
+            "question": "CompletableFuture 默认使用什么线程池？",
+            "answer": "默认使用ForkJoinPool.commonPool()，这是一个静态共享的线程池，并行度默认为CPU核心数减1（单核时为1）。commonPool是守护线程，不阻止JVM退出。使用默认线程池的坑：1）所有任务共享一个池，如果某个任务阻塞可能影响其他任务。2）守护线程属性导致JVM退出时不等待任务完成。3）并行度受限，高并发场景可能成为瓶颈。生产环境建议自定义线程池：用ThreadPoolExecutor创建，核心线程数根据任务类型配置，拒绝策略设为CallerRunsPolicy让调用方执行。"
+          },
+          {
+            "question": "你怎么在项目里用过 CompletableFuture？",
+            "answer": "这个问题考察的是CompletableFuture 和传统 Future 的区别？相关的深度理解。项目中用CompletableFuture替代回调地狱，将多个串行或并行的异步任务串联起来。例如先查缓存，缓存未命中再查数据库，最后聚合结果返回，代码结构清晰。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "thenApply 和 thenCompose 的区别？",
+            "answer": "thenApply用于转换结果，返回一个新的值；thenCompose用于扁平化嵌套的CompletableFuture，当异步任务返回的还是CompletableFuture时用thenCompose避免嵌套过深。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch1_q8",
+      "chapterId": "ch1",
+      "number": 8,
+      "title": "生产者消费者模式怎么实现？有哪些方式？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "实现方式：\n\n1. synchronized + wait/notify\n   • 经典实现，wait() 释放锁，notify() 唤醒\n   • 缺点：代码复杂，容易死锁，notify 随机唤醒可能唤醒错误线程\n\n2. ReentrantLock + Condition\n   • 比 wait/notify 更灵活\n   • 可以分组唤醒：conditionA.signal() 只唤醒等待 conditionA 的线程\n   • 示例：阻塞队列实现\n\n3. BlockingQueue（最推荐）\n   • ArrayBlockingQueue（有界，FIFO）\n   • LinkedBlockingQueue（无界队列，默认 Integer.MAX_VALUE）\n   • put() 阻塞直到队列不满，take() 阻塞直到队列不空\n   • 生产者：queue.put(item)，消费者：queue.take()\n\n4. PipedInputStream/PipedOutputStream\n   • 不推荐：只能单生产者单消费者，且容易死锁\n\n5. Disruptor（高性能场景）\n   • LMAX 开源的高性能队列\n   • 环形缓冲区 + 序号栅栏\n   • 无锁设计，吞吐量可达百万级\n   • 支持多消费者和依赖关系",
+        "followUp": [
+          {
+            "question": "BlockingQueue 的实现原理？ArrayBlockingQueue vs LinkedBlockingQueue 的区别？",
+            "answer": "ArrayBlockingQueue用有界数组实现，生产者put()时队列满会阻塞，消费者take()时队列空会阻塞。LinkedBlockingQueue用链表实现，默认无界（Integer.MAX_VALUE），但可以设置容量控制内存使用。"
+          },
+          {
+            "question": "你们项目里用的哪种？",
+            "answer": "这个问题考察的是生产者消费者模式怎么实现？有哪些方式？相关的深度理解。项目中使用BlockingQueue实现简单的生产消费模式。如果需要更高性能，会选择Disruptor；如果需要更复杂的功能（如延迟消息），会使用RocketMQ或Kafka。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Disruptor 为什么这么快？",
+            "answer": "这个问题考察的是生产者消费者模式怎么实现？有哪些方式？相关的深度理解。Disruptor快的原因：1）环形缓冲区无锁设计；2）避免伪共享（缓存行对齐）；3）预先分配对象避免GC；4）序号栅栏机制协调生产者和消费者。单机吞吐量可达百万级。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q1",
+      "chapterId": "ch2",
+      "number": 1,
+      "title": "JVM 运行时数据区有哪些？哪些是线程共享的，哪些是线程私有的？",
+      "difficulty": "basic",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "线程私有（随线程生命周期）：\n• 程序计数器（PC Register）：当前执行的字节码行号，线程恢复执行时靠它定位\n• 虚拟机栈（VM Stack）：每个方法调用创建一个栈帧，存储局部变量表、操作数栈、动态链接等\n• 本地方法栈（Native Method Stack）：为 native 方法服务，HotSpot 合二为一\n\n线程共享（随虚拟机生命周期）：\n• 堆（Heap）：几乎所有对象实例和数组分配在堆，是 GC 的主要管理区域\n• 方法区（MetaSpace）：存储类信息（类名、访问修饰符、字段描述、方法描述等）、常量、静态变量、JIT 编译后的代码。JDK 1.8 用 MetaSpace 替代了 PermGen\n\n直接内存：\n• 不是 JVM 运行时数据区的一部分\n• NIO 的 DirectByteBuffer 分配的堆外内存\n• 受 -XX:MaxDirectMemorySize 限制\n• 避免 JVM 堆和本地堆之间的数据复制，提升 IO 效率",
+        "followUp": [
+          {
+            "question": "为什么程序计数器是私有的？",
+            "answer": "程序计数器私有是线程切换机制的核心保证。每个线程需要独立记录自己执行到的字节码位置，因为CPU时间片轮转时，线程被暂停后再次恢复执行，必须知道从哪条指令继续。JVM规范要求每条字节码指令都有对应的PC值，解释器通过改变PC值选取下一条指令。如果程序计数器是线程共享的，线程切换时就会丢失自己的执行位置，导致无法正确恢复执行。对于Java方法，PC记录正在执行的字节码地址；对于Native方法，PC值为undefined。程序计数器是唯一不会发生OutOfMemoryError的区域，因为空间大小在编译时就已经确定。"
+          },
+          {
+            "question": "虚拟机栈和本地方法栈的区别？",
+            "answer": "虚拟机栈和本地方法栈的核心区别在于服务对象不同。虚拟机栈（VM Stack）为Java方法服务，每个方法调用创建一个栈帧（Stack Frame），包含局部变量表、操作数栈、动态链接、方法返回地址等。每个线程的虚拟机栈大小可通过-Xss调整，默认1MB。本地方法栈（Native Method Stack）为Native方法服务，在JVM规范中没有强制实现，HotSpot将二者合二为一，使用同一个栈空间。两种栈在StackOverflowError时表现相同（线程请求的栈深度超过VM允许），但OutOfMemoryError情况不同：本地方法栈在内存耗尽时抛OutOfMemoryError，虚拟机栈在创建线程时抛OutOfMemoryError（因为线程启动时就要分配栈空间）。"
+          },
+          {
+            "question": "直接内存是什么？什么时候会用到？",
+            "answer": "直接内存是堆外内存，不受JVM堆大小限制。NIO的DirectByteBuffer分配在此，通过零拷贝技术避免堆内和堆外数据复制，提升IO效率。常用于高性能IO场景如Netty。需要通过-XX:MaxDirectMemorySize设置上限。"
+          },
+          {
+            "question": "HotSpot 和其他 JVM 实现的区别？",
+            "answer": "HotSpot是OracleJDK和OpenJDK默认的JVM实现，主要特点：1）热点代码探测：通过JIT编译器将热点代码编译为机器码直接执行，性能接近原生代码；2）多编译器架构：Client Compiler（C1，快速编译）和Server Compiler（C2，深度优化）可根据场景选择；3）OopMap和Safe Point：高效管理对象引用，支持准确式GC。其他JVM实现：J9（IBM）是高度可定制的商业JVM，JRockit（Oracle，已停止维护）以高性能著称，GraalVM是多语言虚拟机支持AOT和JIT。选型建议：生产环境首选HotSpot（JDK 11+），追求极限性能可尝试GraalVM Native Image（JDK 21+ Preview）。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q2",
+      "chapterId": "ch2",
+      "number": 2,
+      "title": "什么情况下会 OOM？各区域 OOM 的场景？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "堆 OOM（java.lang.OutOfMemoryError: Java heap space）：\n• new 大对象时，Eden 区放不下且没有 Survivor 空间可以回收\n• 内存泄漏：集合类只增不减，典型如 HashMap 不断 put 但从不清理\n• 一次性加载过多数据到内存（如从数据库查出全表数据）\n• 解决方案：-Xmx 设置上限 + MAT/jmap 分析堆快照\n\n虚拟机栈 OOM（java.lang.StackOverflowError）：\n• 递归调用没有出口（基础阶段主要场景）\n• 创建过多线程（每个线程默认 1MB 栈空间）- 这种情况是 OutOfMemoryError\n\n方法区 OOM（java.lang.OutOfMemoryError: Metaspace）：\n• 动态生成大量类：使用 CGLIB、ASM 字节码技术不停生成类\n• 大量常量池：String.intern() 过度使用\n• 解决方案：-XX:MetaspaceSize 和 -XX:MaxMetaspaceSize 设置上限\n\n直接内存 OOM：\n• NIO 的 DirectByteBuffer 分配过多堆外内存\n• -XX:MaxDirectMemorySize 设置上限",
+        "followUp": [
+          {
+            "question": "你们线上有没有遇到过 OOM？怎么排查的？",
+            "answer": "线上OOM排查流程：1）先看是堆内还是Metaspace；2）用jmap -heap看内存使用比例；3）jmap -dump导出堆快照；4）用MAT分析大对象或内存泄漏。常见原因是集合只增不减或一次性加载数据过多。"
+          },
+          {
+            "question": "MAT 和 jmap、jhat 怎么用？",
+            "answer": "MAT（Memory Analyzer Tool）是专业的堆内存分析工具，打开.hprof文件后重点关注：Histogram视图看对象数量，Dominator Tree看引用链，Leak Suspects报告自动定位泄漏点。jmap -histo比dump快速，可以快速定位对象数量异常。"
+          },
+          {
+            "question": "有没有遇到过 Metaspace OOM？",
+            "answer": "线上OOM排查流程：1）先看是堆内还是Metaspace；2）用jmap -heap看内存使用比例；3）jmap -dump导出堆快照；4）用MAT分析大对象或内存泄漏。常见原因是集合只增不减或一次性加载数据过多。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q3",
+      "chapterId": "ch2",
+      "number": 3,
+      "title": "垃圾回收算法有哪些？各有什么特点？",
+      "difficulty": "basic",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "标记-清除（Mark-Sweep）：\n• 两遍扫描：第一遍标记存活对象，第二遍清除未标记对象\n• 缺点：产生内存碎片（不连续的空间），大对象分配困难\n• 优点：不需要移动对象\n\n复制（Copying）：\n• 将内存分成两块（From/To 或 Eden/Survivor）\n• 存活对象复制到另一半，然后整体清空这一半\n• 缺点：可用内存减半，浪费空间\n• 优点：简单高效，没有碎片\n• 年轻代使用此算法（Eden + Survivor）\n\n标记-整理（Mark-Compact）：\n• 标记存活对象后，将存活对象向一端移动，然后清空边界外的内存\n• 优点：无碎片，内存利用率高\n• 缺点：需要移动对象，开销较大\n• 老年代使用此算法\n\n分代收集：\n• 年轻代：Minor GC，使用复制算法（对象存活率低）\n• 老年代：Major/Full GC，使用标记-整理算法（对象存活率高）\n• 元空间：Full GC 管理（回收常量池和废弃的常量）",
+        "followUp": [
+          {
+            "question": "对象在年轻代的存活过程？",
+            "answer": "对象在年轻代的存活过程：新建对象在Eden区，Minor GC时存活对象复制到Survivor From区，再次Minor GC时存活对象复制到Survivor To区，年龄+1，达到阈值（默认15）后进入老年代。"
+          },
+          {
+            "question": "为什么老年代不用复制算法？",
+            "answer": "老年代不适用复制算法的根本原因是存活对象比例高。年轻代对象特点是朝生夕死，98%的对象在第一次Minor GC时就会被回收，存活率仅1%-2%，复制算法只需移动少量存活对象，效率很高。老年代对象通常生命周期长、存活率高，复制算法需要复制大量对象，开销巨大且浪费一半空间。标记-整理算法（Mark-Compact）更适合老年代：先标记存活对象，然后将所有存活对象向一端移动，最后清理边界外的空间，既没有碎片，整理开销也相对可控。G1引入的Region化设计让老年代也可以进行部分复制（年轻代回收后的存活对象可能进入老年Region），但整体仍基于标记-整理。"
+          },
+          {
+            "question": "GC 停顿的原因是什么？",
+            "answer": "GC停顿（Stop The World，STW）的根本原因：GC时需要确保对象引用关系不变，必须暂停所有应用线程。JVM通过安全点（Safe Point）机制实现停顿：只有在安全点时才能进行GC，安全点通常位于方法调用、循环跳转、异常跳转等指令处。不同GC算法的停顿时间：Serial GC停顿最长（单线程）；Parallel GC停顿时间与堆大小成正比；CMS停顿时间短但有重标记阶段STW；G1通过并发标记和可预测停顿控制，将STW时间控制在用户设定范围内（默认200ms）。JDK 11+的ZGC停顿时间不超过10ms。优化方向：选择停顿时间可控的GC（G1/ZGC）、合理设置堆大小和GC参数、避免创建大量短期对象增加GC压力。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q4",
+      "chapterId": "ch2",
+      "number": 4,
+      "title": "常见垃圾收集器？CMS 和 G1 的区别？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "常见垃圾收集器：\n\n| 收集器 | 算法 | 特点 | 适用场景 |\n|--------|------|------|----------|\n| Serial | 串行 | 单线程，STW | 单核、小数据量 |\n| Parallel（PS）| 并行 | 多线程，关注吞吐量 | 后台批处理 |\n| ParNew | 并行 | 新生代，配合 CMS | - |\n| CMS | 并发 | 初始标记→并发标记→重新标记→并发清除 | 低延迟需求 |\n| G1 | 区域化 | 分成多个 Region，可预测停顿 | 大堆、多核 |\n\nCMS 的问题：\n1. 浮动垃圾：并发清理阶段用户线程还在运行，会产生新的垃圾（这次清理不掉，只能等下次）\n2. 空间碎片：标记-清除算法导致老年代空间不连续\n3. CPU 敏感：并发阶段占用 CPU 资源，默认使用 25% 的 CPU\n4. 浮动垃圾过多导致 concurrent mode failure，然后退化到串行 Full GC\n\nG1 的优势：\n1. 区域化：将堆分成大小相等的 Region（1MB-32MB），每个 Region 可独立作为 Eden/Survivor/Old\n2. 可预测停顿：可以设置 MaxGCPauseMillis（如 200ms），G1 会优先回收价值最大的 Region\n3. 整合了标记-整理算法，不产生空间碎片\n4. 初始标记、最终标记、筛选回收阶段仍需 STW，但时间很短\n5. 适合大堆（6GB+），在保证延迟的同时提供良好吞吐量",
+        "followUp": [
+          {
+            "question": "ZGC 和 Shenandoah 了解吗？",
+            "answer": "ZGC和Shenandoah是新一代垃圾收集器，主打低延迟。ZGC通过着色指针和读屏障实现并发标记、整理，停顿时间不超过10ms，但吞吐量略低于G1。Shenandoah是RedHat开发的类似技术，不分代。"
+          },
+          {
+            "question": "你们线上用的什么收集器？参数怎么配的？",
+            "answer": "线上GC收集器选型依据业务特点：低延迟要求选G1（-XX:+UseG1GC），大堆（6GB+）场景表现优秀，P99停顿可控制在200ms内；高吞吐批处理选Parallel GC（-XX:+UseParallelGC）；对延迟极端敏感选ZGC（-XX:+UseZGC）。风控系统配置示例：-XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:G1HeapRegionSize=4m -XX:InitiatingHeapOccupancyPercent=45。监控重点：GC频率（每分钟不应超过1次Minor GC）、Full GC频率（应极少发生）、停顿时间分布（P99/P999）。如果G1频繁Full GC，需调整-XX:InitiatingHeapOccupancyPercent或增加堆大小。JDK 17+可考虑ZGC进一步降低延迟。"
+          },
+          {
+            "question": "G1 的 Region 大小怎么确定？",
+            "answer": "G1的Region大小通过-XX:G1HeapRegionSize设置，范围1MB-32MB，根据堆大小自动确定。Region是G1实现可预测停顿和区域回收的基础，不同Region可以独立作为Eden、Survivor或Old区。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q5",
+      "chapterId": "ch2",
+      "number": 5,
+      "title": "对象创建过程？对象在内存中的布局？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "对象创建过程（五步）：\n1. 类加载检查：遇到 new 指令时，检查常量池中是否能定位到这个类的符号引用，检查这个类是否已加载、解析、初始化\n2. 分配内存：从堆中划分一块确定大小的内存（指针碰撞或空闲列表）\n3. 初始化零值：将分配到的内存空间初始化为零值（不包括对象头）\n4. 设置对象头：设置 Mark Word（哈希码、GC 分代年龄、锁状态等）和类型指针\n5. 执行构造函数：调用 <init> 方法，按程序员的意图初始化对象\n\n内存分配方式：\n• 指针碰撞（Bump the Pointer）：假设堆是绝对规整的，用过的在一边，没用过的在另一边，中间放一个指针。分配时往没用过方向移动相应大小。（Serial、ParNew 等带压缩的收集器）\n• 空闲列表（Free List）：假设堆不规整，虚拟机维护一个列表记录哪些内存块可用。分配时从列表中找到足够大的块，并更新列表。（CMS 这种基于 Mark-Sweep 的收集器）\n\n对象头包含三部分：\n1. Mark Word：32/64 bits，存储哈希码、GC 分代年龄、锁状态、偏向线程 ID 等\n2. 类型指针：指向类元数据的指针，JVM 通过它确定对象是哪个类的实例\n3. 数组长度（如果对象是数组）：记录数组长度，Object不缺",
+        "followUp": [
+          {
+            "question": "对象头里的 Mark Word 在不同锁状态下的内容？",
+            "answer": "Mark Word在32位和64位JVM中长度不同（32位占32bits，64位压缩后占52bits），存储内容随锁状态变化：无锁状态存储对象HashCode、分代年龄、偏向锁标志；偏向锁状态存储偏向线程ID、偏向时间戳、分代年龄；轻量级锁状态存储指向线程栈中Lock Record的指针；重量级锁状态存储指向ObjectMonitor的指针；GC标记状态用于可达性分析。面试追问点：synchronized锁升级过程就是Mark Word内容变化的过程，通过CAS操作修改Mark Word实现。实际应用：可以通过jol-core打印对象头信息理解锁状态，-XX:+PrintFlags查看偏向锁延迟时间配置。"
+          },
+          {
+            "question": "内存分配怎么保证线程安全？",
+            "answer": "线程安全分配内存有两种方案：指针碰撞（Bump the Pointer）和空闲列表（Free List）。指针碰撞适用于堆内存规整的情况，分配时移动指针指向空闲内存起始位置，多线程下通过CAS保证只有一个线程能移动指针成功。空闲列表适用于堆不规整的情况，维护一个记录空闲内存块的列表，分配时从列表中找到合适大小的块并更新列表。HotSpot的Serial和ParNew使用指针碰撞，CMS使用空闲列表（因为其标记-清除算法会产生碎片）。另一个线程安全措施是TLAB（Thread Local Allocation Buffer）：每个线程在堆中预分配一小块内存（默认Eden的1%），线程在自己的TLAB中分配，避免了多线程竞争。"
+          },
+          {
+            "question": "TLAB 是什么？",
+            "answer": "TLAB（Thread Local Allocation Buffer）是JVM为每个线程预分配的线程本地缓冲区，默认为Eden区域的1%（可调整）。核心作用：减少多线程分配内存时的竞争，提高分配吞吐量。原理：每个线程在TLAB中分配，TLAB用完后再分配新的，避免了多线程在堆的同一个位置竞争。只有大于TLAB大小的对象才直接在堆上分配。TLAB相关的JVM参数：-XX:+UseTLAB启用（默认启用），-XX:TLABSize设置TLAB大小，-XX:+ResizeTLAB让JVM动态调整TLAB大小。监控TLAB使用情况：-XX:+PrintTLAB可打印TLAB统计信息。TLAB是JVM优化分配的经典技术，相比直接使用CAS分配，性能可提升数倍。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q6",
+      "chapterId": "ch2",
+      "number": 6,
+      "title": "线上 GC 频繁怎么排查？",
+      "difficulty": "intermediate",
+      "labels": [
+        "高频追问"
+      ],
+      "answer": {
+        "content": "排查步骤：\n\n1. 监控观察（jstat）\n   jstat -gcutil <pid> 1000\n   观察 YGC（年轻代 GC）次数、YGCT（年轻代 GC 耗时）\n   观察 FGC（Full GC）次数、FGCT（Full GC 耗时）\n   如果 FGC 频繁，说明老年代满了或者对象分配速率过高\n\n2. 堆内存分析（jmap）\n   jmap -heap <pid>：查看堆配置、已使用比例\n   jmap -histo <pid>：查看对象统计，按对象大小排序\n   jmap -dump:format=b,file=heap.hprof <pid>：导出堆快照（离线分析）\n\n3. 离线分析（MAT/JProfiler）\n   打开 .hprof 文件\n   重点关注：\n   - 大对象（直接分配在老年代的大数组、大集合）\n   - 长生命周期对象（缓存未清理）\n   - 类加载器泄漏（自定义 ClassLoader 未卸载）\n\n4. GC 日志分析\n   -XX:+PrintGCDetails -Xloggc:/path/to/gc.log -XX:+PrintGCDateStamps\n   使用 GCeasy 或 GCViewer 分析\n\n5. 常见原因\n   - 年轻代空间不足：-Xmn 调大\n   - 长生命周期对象过多：检查缓存、定时任务\n   - 对象分配速率过高：检查代码中大量短生命周期对象创建",
+        "followUp": [
+          {
+            "question": "你们遇到过 GC 频繁的问题吗？怎么解决的？",
+            "answer": "GC频繁排查和解决经验：1）确认是Minor GC频繁还是Full GC频繁，用jstat -gcutil pid 1000每秒监控。2）Minor GC频繁通常是年轻代空间不足，可通过-Xmn调大年轻代或优化对象生命周期。3）Full GC频繁通常是老年代空间不足或对象分配速率过高，需要排查是否有内存泄漏或一次性加载过多数据。4）真实案例：一次GC频繁是因为引入新功能后，每次请求都创建新的SimpleDateFormat对象（应该用ThreadLocal或静态变量）。解决后又遇到大对象直接进入老年代导致Full GC，排查发现是缓存了太多数据。监控和告警是关键：GC频率突增往往是业务逻辑变化的信号。"
+          },
+          {
+            "question": "FGC 和 YGC 的区别？什么情况会触发 Full GC？",
+            "answer": "YGC（Young GC/Minor GC）只回收年轻代，使用复制算法，停顿时间短（通常几十毫秒）。FGC（Full GC）回收整个堆（年轻代+老年代+Metaspace），使用标记-整理或标记-清除算法，停顿时间长（可能数秒）。触发Full GC的条件：1）老年代空间不足；2）永生代（Metaspace）空间不足；3）System.gc()调用；4）CMS GC时出现Concurrent Mode Failure；5）分配担保失败。Minor GC频繁通常是正常现象（年轻代太小或对象生命周期短），Full GC频繁才是问题。优化方向：减少Full GC频率需要关注老年代对象生命周期、缓存大小、Metaspace使用。"
+          },
+          {
+            "question": "怎么判断是 Minor GC 还是 Full GC？",
+            "answer": "判断GC类型的方法：1）GC日志：包含Minor GC或Full GC关键字；2）jstat -gcutil：观察各区域空间变化，O区（老年代）和M区（Metaspace）空间变化说明是Full GC；3）GC日志配置：-Xlog:gc*:file=gc.log通过日志判断；4）G1 GC日志识别：G1 Young GC和G1 Mixed GC都是年轻代相关，G1 Old GC是Full GC。实际监控中，通常设置日志和告警：Minor GC频率正常（每分钟1-3次），Full GC应该极少发生（几小时甚至几天一次）。如果Full GC频率异常，需要立即排查。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch2_q7",
+      "chapterId": "ch2",
+      "number": 7,
+      "title": "JVM 调优参数用过哪些？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "常用参数：\n\n堆配置：\n• -Xms4g：初始堆大小\n• -Xmx4g：最大堆大小（建议 Xms = Xmx，防止运行时动态扩展）\n• -Xmn2g：年轻代大小\n• -XX:+UseG1GC：使用 G1 收集器\n• -XX:MaxGCPauseMillis=200：最大 GC 停顿时间（G1）\n• -XX:+HeapDumpOnOutOfMemoryError：OOM 时自动导出堆快照\n• -XX:HeapDumpPath=/path/to/dump：快照保存路径\n\nMetaSpace 配置：\n• -XX:MetaspaceSize=256m：初始元空间大小\n• -XX:MaxMetaspaceSize=512m：最大元空间大小\n\nGC 日志：\n• -Xlog:gc*:file=/path/to/gc.log:time:filecount=5,filesize=10M\n\n线程配置：\n• -Xss1m：线程栈大小（默认 1MB）\n• -XX:+UseStringDeduplication：字符串去重（JDK 8+）\n\nG1 特殊参数：\n• -XX:InitiatingHeapOccupancyPercent=45：老年代占用多少时触发 Mixed GC（默认 45%）\n• -XX:G1NewSizePercent=5：年轻代占堆的最小比例\n• -XX:G1MaxNewSizePercent=60：年轻代占堆的最大比例",
+        "followUp": [
+          {
+            "question": "Xms 和 Xmx 设置成一样有什么好处？",
+            "answer": "Xms和Xmx设置相同的核心好处是避免运行时堆大小调整导致的GC抖动。堆扩展时需要触发GC来申请新内存，堆收缩时也需要GC释放空间，运行时调整会增加额外的GC压力，影响服务稳定性。生产环境建议：1）Xms=Xmx=总堆大小（如4g或8g）；2）根据业务特点设置年轻代大小（-Xmn），通常为堆的1/3到1/2；3）如果需要频繁GC，考虑调整年轻代和老年代比例。另一个好处：简化JVM参数配置，降低运维复杂度。常见错误：只设Xmx不设Xms，导致启动时从较小堆开始逐渐扩展，初期GC频繁。"
+          },
+          {
+            "question": "怎么根据机器配置和业务特点来设置这些参数？",
+            "answer": "JVM参数设置方法论：1）确定总堆大小（Xmx），参考：在线业务建议机器内存的50%-75%，如16GB机器设8GB堆；2）年轻代大小（Xmn），一般为目标1/3到1/2；3）选择GC收集器（-XX:+UseG1GC适合大堆低延迟）；4）设置停顿时间目标（-XX:MaxGCPauseMillis=200）。计算依据：峰值QPS乘以平均耗时乘以GC容忍系数等于内存需求。举例：峰值QPS=5000，平均耗时50ms，则年轻代至少需要5000乘以0.05乘以倍数。监控调优：观察GC频率和停顿时间，逐步调整。工具：jstat分析GC行为，GCViewer分析GC日志。核心原则是让GC频率和停顿时间在业务可接受范围内。"
+          },
+          {
+            "question": "你们生产环境 JVM 参数怎么配置的？",
+            "answer": "生产环境JVM参数示例：-Xms4g -Xmx4g -Xmn2g -XX:+UseG1GC -XX:MaxGCPauseMillis=200 -XX:+HeapDumpOnOutOfMemoryError。核心原则是Xms=Xmx防止动态扩展导致的GC抖动，G1适合大堆低延迟场景。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q1",
+      "chapterId": "ch3",
+      "number": 1,
+      "title": "Spring Bean 的生命周期？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "完整生命周期（按顺序）：\n\n1. 实例化（Instantiation）：调用构造函数创建 Bean 实例\n2. 属性填充（Populate）：Spring 通过反射注入依赖（@Autowired、@Value 等）\n3. BeanNameAware：调用 setBeanName()，让 Bean 知道自己被容器定义的名称\n4. BeanFactoryAware：调用 setBeanFactory()，让 Bean 持有创建它的工厂\n5. BeanFactoryPostProcessor.postProcessBeanFactory()：此时所有 Bean 定义已加载，但未创建实例，可修改 Bean 定义\n6. InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()：在构造函数调用前返回代理对象（如果返回非空，则跳过构造函数）\n7. 构造函数执行\n8. postProcessAfterInstantiation()：实例创建后，属性填充前\n9. 属性填充（@Autowired、@Resource 等）\n10. BeanFactoryAware 再次回调（如果 Bean 实现了 BeanFactoryAware）\n11. BeanPostProcessor.postProcessBeforeInitialization()：初始化方法调用前\n12. InitializingBean.afterPropertiesSet()：属性填充完成后\n13. init-method：用户定义的初始化方法\n14. BeanPostProcessor.postProcessAfterInitialization()：初始化方法调用后\n15. DisposableBean.destroy()：容器关闭时调用\n16. destroy-method：用户定义的销毁方法",
+        "followUp": [
+          {
+            "question": "BeanFactoryPostProcessor 和 BeanPostProcessor 的区别？",
+            "answer": "BeanFactoryPostProcessor在Bean实例化前调用，可以修改Bean定义；BeanPostProcessor在Bean实例化后、初始化前后调用，可以对Bean进行代理。执行顺序：BeanFactoryPostProcessor先执行，然后才创建Bean实例。"
+          },
+          {
+            "question": "你们有没有自定义过 BeanPostProcessor？做什么用？",
+            "answer": "自定义BeanPostProcessor的实际应用：1）自定义注解解析，如统计方法调用次数的注解，在BeanPostProcessor中拦截带注解的方法并替换为代理；2）动态注入属性，如从配置中心读取配置注入到Bean的@Value字段；3）为特定Bean创建代理，实现权限校验、日志记录等横切关注点。实现步骤：实现BeanPostProcessor接口，在postProcessBeforeInitialization和postProcessAfterInitialization中对目标Bean进行包装或增强。注意事项：BeanPostProcessor会作用于所有Bean，如果只想处理特定Bean，需要在代码中判断bean.getClass()或beanName。Spring大量内置功能都基于BeanPostProcessor实现，如Autowired、Resource、PreDestroy等注解。"
+          },
+          {
+            "question": "Bean 的作用域有哪些？prototype 和 singleton 的区别？",
+            "answer": "Spring Bean的作用域：1）singleton（默认），整个容器生命周期只创建一个实例，容器启动时创建（可以通过lazy-init改变）；2）prototype，每次获取都创建新实例，Spring只负责创建和属性填充，不管理生命周期，需用户自行清理；3）request，每个HTTP请求创建一个实例，仅在Web应用有效；4）session，同一个HTTP Session共享一个实例；5）application，ServletContext级别共享；6）websocket，WebSocket生命周期内共享。prototype和singleton的核心区别：singleton适合无状态的Bean，prototype适合有状态的Bean或需要每次全新初始化的场景。核心陷阱：prototype作用域的Bean不会被AOP代理（因为生命周期不由Spring管理）。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q2",
+      "chapterId": "ch3",
+      "number": 2,
+      "title": "Spring 是怎么解决循环依赖的？",
+      "difficulty": "advanced",
+      "labels": [
+        "必须掌握",
+        "深入理解"
+      ],
+      "answer": {
+        "content": "三级缓存（singletonObjects / earlySingletonObjects / singletonFactories）：\n\nsingletonObjects（一级缓存）：存放成品 Bean，可直接使用\nearlySingletonObjects（二级缓存）：存放早期暴露的 Bean，对象未完全初始化完成（属性还没填充）\nsingletonFactories（三级缓存）：存放 Lambda 表达式（ObjectFactory），用于创建早期 Bean\n\n循环依赖解决流程（A 依赖 B，B 依赖 A）：\n\n1. A 创建中，发现依赖 B，先尝试获取 B\n2. 一级缓存没有 B，去二级缓存找（也没有）\n3. 去三级缓存找到 B 的 ObjectFactory，调用它创建早期 B\n4. 早期 B 存入二级缓存，从三级缓存移除\n5. B 继续创建完成，属性填充顺利完成\n6. B 存入一级缓存，从二级缓存移除\n7. A 拿到 B 的引用，继续创建完成\n8. A 存入一级缓存\n\n为什么需要三级缓存，两级不够吗？\n• 三级缓存解决的是「AOP 代理」问题\n• 如果 Bean 需要被代理，一级和二级缓存都无法正确处理代理对象的创建时机\n• 二级缓存不能存 ObjectFactory，因为可能调用多次产生不同代理对象\n• 三级缓存保证每个 Bean 只创建一个早期引用，且能正确处理代理",
+        "followUp": [
+          {
+            "question": "为什么需要三级缓存，两级不够吗？",
+            "answer": "这涉及到系统设计的核心权衡。以线程池为例，核心参数（corePoolSize、maxPoolSize、queueCapacity）需要根据业务负载特点（CPU密集/IO密集）、峰值QPS、平均耗时来综合计算，确保性能最优且资源可控。"
+          },
+          {
+            "question": "构造器注入能解决循环依赖吗？",
+            "answer": "构造器注入无法解决循环依赖，因为构造器注入在构造阶段就需要所有参数，参数对应的Bean还在创建中。举例：A的构造器需要B，B的构造器需要A，创建A时发现缺B，创建B时发现缺A，形成死锁。Spring会抛BeanCurrentlyInCreationException。解决方案：1）改用setter注入，让Bean创建完成后再注入依赖；2）使用@Lazy延迟加载，构造时先返回一个代理对象，实际调用时才真正初始化；3）重构代码消除循环依赖，这是最根本的解决方案。实际项目中推荐方案1，因为setter注入配合三级缓存可以解决大多数循环依赖问题，且代码侵入性小。"
+          },
+          {
+            "question": "prototype 作用域能解决循环依赖吗？",
+            "answer": "prototype作用域无法解决循环依赖，因为Spring不会缓存prototype Bean的早期引用。prototype Bean每次获取都会创建新实例，Spring无法在创建过程中提前暴露一个引用给其他Bean，导致循环依赖无法形成。Spring Boot 2.6+默认禁止prototype循环依赖检测（spring.main.allow-circular-references=false），直接报错而不是运行时报错。解决方案：1）重构代码消除循环依赖，这是最推荐的；2）使用@Lazy延迟加载，在真正需要时才创建Bean；3）将prototype Bean改为singleton Bean，如果业务允许。实际项目中，prototype Bean很少用于依赖注入场景，更多用于每次需要全新状态的场景。"
+          },
+          {
+            "question": "@Async 循环依赖能解决吗？",
+            "answer": "@Async循环依赖问题根源：@Async会生成异步代理类（通过AnnotationAsyncExecutionInterceptor），和普通代理类的创建时机不同。三级缓存中的ObjectFactory创建的是同步代理，但实际需要异步代理，导致代理类型不匹配。Spring Boot 2.1之前可以通过配置spring.main.allow-circular-references=true允许循环依赖但不生效（实际不走代理）。Spring Boot 2.6+直接禁止prototype循环依赖。解决方案：1）重构代码消除@Async导致的循环依赖，这是根本解决；2）将异步调用改为同步调用+线程池异步执行；3）使用@Lazy减少初始化时的依赖。生产环境中@Async和其他注解混合使用时要特别注意循环依赖问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q3",
+      "chapterId": "ch3",
+      "number": 3,
+      "title": "Spring 事务的传播行为？有哪些？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "| 传播行为 | 含义 |\n|----------|------|\n| REQUIRED | 有就用，没有就创建新的（默认） |\n| REQUIRES_NEW | 每次都创建新事务，外层事务被挂起 |\n| NESTED | 在当前事务中嵌套执行，使用 Savepoint 机制 |\n| SUPPORTS | 有就用，没有就不使用事务 |\n| NOT_SUPPORTED | 不管有没有都挂起，在事务外执行 |\n| MANDATORY | 必须有事务，没有则抛异常 |\n| NEVER | 必须没事务，有则抛异常 |\n\nREQUIRES_NEW 和 NESTED 的区别：\n• REQUIRES_NEW：开启全新的子事务，事务完全独立，外层事务挂起\n• NESTED：在当前事务内嵌套执行，使用 Savepoint 回滚点。外层事务失败会携带子事务一起回滚，子事务可以独立提交\n\n示例场景：\n• REQUIRES_NEW：日志记录（无论业务成功失败都记录，日志事务独立）\n• NESTED：主事务内的子步骤，需要跟随主事务一起回滚\n\n实际项目选型：\n• 日志、审计、消息发送等非核心操作 → REQUIRES_NEW\n• 主业务内的分支操作 → NESTED\n• 查询类操作 → SUPPORTS 或 NOT_SUPPORTED",
+        "followUp": [
+          {
+            "question": "REQUIRES_NEW 和 NESTED 的区别？",
+            "answer": "REQUIRES_NEW和NESTED的核心区别在于事务独立性。REQUIRES_NEW每次都创建全新的子事务，完全独立于外层事务，外层事务被挂起直到子事务完成，子事务提交/回滚不影响外层事务。NESTED在当前事务中嵌套执行，使用数据库Savepoint机制，外层事务失败会携带子事务一起回滚（子事务可以独立提交）。选型场景：日志记录类操作要求无论业务成功失败都记录，用REQUIRES_NEW；主业务内的子步骤需要跟随主事务回滚，用NESTED。实现原理：NESTED利用数据库 Savepoint 实现了嵌套事务，而REQUIRES_NEW是真正独立的新事务。NESTED性能优于REQUIRES_NEW（无需创建新事务），但隔离性不如REQUIRES_NEW。"
+          },
+          {
+            "question": "你们项目里用过哪些？为什么这么选？",
+            "answer": "项目中事务传播行为的使用经验：1）核心业务方法用REQUIRED（默认），加入当前事务或创建新事务；2）日志记录用REQUIRES_NEW，确保日志事务独立，不受业务事务回滚影响；3）主从操作关联场景用NESTED，从操作失败可以回滚到主操作开始前的Savepoint；4）查询类方法用NOT_SUPPORTED，挂起当前事务以非事务方式执行，提升性能。选型依据：核心原则是明确每个方法的事务边界，区分核心业务和非核心业务。非核心操作（日志、审计、消息）应与核心业务隔离，避免因非核心操作失败影响核心业务。"
+          },
+          {
+            "question": "@Transactional 失效的场景？",
+            "answer": "@Transactional失效的典型场景：1）方法非public，Spring AOP代理无法拦截非public方法；2）同类内部调用（自调用），this.method()不经过代理对象；3）异常被catch吞掉，事务管理器收不到异常；4）抛出的不是RuntimeException，默认只对RuntimeException回滚；5）数据库不支持事务（如MyISAM）；6）多数据源未指定事务管理器。解决方案：1）改为public方法；2）注入自身再调用或使用AopContext.currentProxy()；3）重新抛出异常或手动设置回滚；4）配置rollbackFor=Exception.class；5）改用InnoDB；6）显式指定transactionManager。排查技巧：加@Transactional验证或开启DEBUG日志观察Spring事务管理。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q4",
+      "chapterId": "ch3",
+      "number": 4,
+      "title": "Spring 事务失效的场景？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "失效场景：\n\n1. 方法不是 public\n   • Spring AOP 是通过代理实现的，protected/private 方法不会被代理类调用\n   • 解决：改为 public 方法\n\n2. 同一个类内部调用（自调用）\n   • this.method() 不经过代理对象，直接调原始对象方法\n   • 解决：注入自身再调用，或使用 AspectJ 编译时织入\n\n3. 异常被 catch 吞掉\n   • try { } catch { /* 什么都没做 */ }\n   • 事务管理器收不到异常，无法回滚\n   • 解决：重新抛出异常，或手动 TransactionInterceptor.currentTransactionStatus().setRollbackOnly()\n\n4. 抛出的不是 RuntimeException\n   • 默认只对 RuntimeException 和 Error 回滚\n   • 解决：@Transactional(rollbackFor = Exception.class)\n\n5. 数据库不支持事务\n   • MyISAM 引擎不支持事务\n   • 解决：改用 InnoDB\n\n6. 多数据源没有指定事务管理器\n   • @Transactional 默认找 PlatformTransactionManager 实现\n   • 多数据源场景需要显式指定 @Transactional(transactionManager = \"txManager1\")",
+        "followUp": [
+          {
+            "question": "怎么解决同类内部调用导致的事务失效？",
+            "answer": "同类内部调用导致事务失效是因为this.method()不经过代理对象。解决方案：1）注入自身再调用；2）使用AopContext.currentProxy()；3）重构到另一个Service；4）使用AspectJ编译时织入。"
+          },
+          {
+            "question": "你们用的什么事务管理器？DataSourceTransactionManager？",
+            "answer": "项目使用DataSourceTransactionManager，是JDBC和MyBatis的标准事务管理器。配置事务管理器时注意指定正确的数据源，多数据源场景需要显式指定transactionManager。"
+          },
+          {
+            "question": "有没有遇到过事务不生效但没报错的情况？",
+            "answer": "这个问题考察的是Spring 事务失效的场景？相关的深度理解。事务不生效但没报错的情况：1）方法非public；2）异常被catch吞掉；3）抛出的是检查型异常而非RuntimeException。排查时可先确认异常能被正确抛出和捕获。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q5",
+      "chapterId": "ch3",
+      "number": 5,
+      "title": "Spring 的三级缓存能解决所有循环依赖吗？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "不能解决的情况：\n\n1. 构造器注入的循环依赖\n   • 三级缓存只解决 setter 注入和字段注入\n   • 构造器注入在构造阶段就需要参数，参数就是另一个 Bean，此时还没创建完，无法提前暴露\n\n2. prototype 作用域的循环依赖\n   • prototype Bean 每次获取都会创建新实例，Spring 不会缓存\n   • 无法提前暴露早期引用\n\n3. @Async 注解的循环依赖\n   • @Async 会生成异步代理类，和普通代理类的创建时机不同\n   • 三级缓存中的 ObjectFactory 创建的是同步代理，但实际需要异步代理\n   • 导致代理类型不匹配，循环依赖失败\n   • Spring Boot 2.x 系列这个问题的修复仍在进程中\n\nSpring Boot 2.6+ 禁止了 prototype 循环依赖检测：\n• spring.main.allow-circular-references=false（默认）\n• 显式报告循环依赖错误而不是运行到一半才发现",
+        "followUp": [
+          {
+            "question": "构造器注入怎么解决循环依赖？",
+            "answer": "构造器注入解决循环依赖的方法：1）改用setter注入替代构造器注入，让Bean可以先创建成功后再注入依赖；2）使用@Lazy注解在构造器参数上延迟加载，Spring注入一个代理对象，实际调用时才初始化真实Bean；3）使用ObjectFactory<T>延迟获取依赖的Bean；4）最根本的方案是重构代码消除循环依赖。实际项目中推荐setter注入方案，因为Spring的三级缓存机制对setter注入和字段注入都能很好支持。重构方案推荐将互相依赖的代码提取到独立Service中，解除循环依赖。"
+          },
+          {
+            "question": "prototype 循环依赖怎么处理？",
+            "answer": "prototype循环依赖无法通过Spring机制解决，因为prototype Bean不被缓存，每次获取都是全新实例，无法提前暴露引用。解决方案：1）重构代码消除循环依赖，这是最推荐的；2）使用@Lazy延迟初始化，在真正需要时才创建Bean；3）将prototype作用域改为singleton，配合@Scope(proxyMode=ScopedProxyMode.TARGET_CLASS)实现延迟加载；4）使用ApplicationContext.getBean()在运行时手动获取，打破循环。实际项目中prototype Bean使用场景很少，大多数依赖注入场景都应使用singleton。"
+          },
+          {
+            "question": "你们项目里有没有遇到 @Async 循环依赖的问题？",
+            "answer": "@Async循环依赖问题经验：@Async注解会在AOP代理层引入额外的异步执行拦截器，与三级缓存的同步代理创建逻辑冲突，导致循环依赖失败。实际案例：ServiceA的某个方法调用ServiceB，同时ServiceB的某个方法调用ServiceA，恰好其中某个方法有@Async注解，Spring启动时报循环依赖错误。解决方案：1）重构代码消除循环依赖，将@Async方法移到独立Service；2）使用线程池异步执行替代@Async：@Async背后也是线程池，可以手动创建线程池实现异步；3）使用@Lazy减少初始化时的依赖。生产环境中推荐方案1，彻底解决问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q6",
+      "chapterId": "ch3",
+      "number": 6,
+      "title": "Dubbo 的 RPC 调用过程？服务治理怎么做的？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "RPC 调用过程（10 步）：\n\n1. 消费端：ProxyFactory 通过接口 Class 生成代理对象（Stub）\n2. 消费端：代理对象调用Invoker（如果配置了 Filter，此时经过Filter链）\n3. 消费端：Client（Netty/Mina）将调用信息编码（Codec2）\n4. 消费端：ExchangeClient 发送请求\n5. 网络传输\n6. 服务端：ExchangeServer 接收数据\n7. 服务端：解码（Codec2）\n8. 服务端：Filter 链（序列化、日志等）\n9. 服务端：Invoker 调用实际业务逻辑\n10. 服务端：业务逻辑执行完成，结果原路返回\n\n服务治理能力：\n\n负载均衡（LoadBalance）：\n• Random：加权随机（默认）\n• RoundRobin：加权轮询\n• LeastActive：最少活跃调用数\n• ConsistentHash：一致性哈希（同参数请求打到同一节点）\n\n熔断降级：\n• Sentinel：流量控制、熔断降级、系统自适应保护\n• Hystrix（已停更，不再维护）\n• 熔断器三个状态：Closed（正常）→ Open（熔断）→ HalfOpen（尝试恢复）\n\n超时控制：\n• timeout：接口级超时配置\n• 默认 1000ms\n• 优先取 Consumer 端配置\n\n重试机制：\n• retries：远程调用失败重试次数（不包含第一次调用）\n• 默认 2 次\n• 只在幂等场景下使用",
+        "followUp": [
+          {
+            "question": "Dubbo 的序列化协议有哪些？你们用的哪种？为什么？",
+            "answer": "这涉及到系统设计的核心权衡。以线程池为例，核心参数（corePoolSize、maxPoolSize、queueCapacity）需要根据业务负载特点（CPU密集/IO密集）、峰值QPS、平均耗时来综合计算，确保性能最优且资源可控。"
+          },
+          {
+            "question": "Dubbo 和 Spring Cloud 怎么选型？",
+            "answer": "Dubbo vs Spring Cloud选型对比：Dubbo专注于高性能RPC调用，适合Java技术栈、延迟敏感的场景；Spring Cloud基于HTTP/REST，适合多语言、开放生态的场景。Dubbo优势：性能高（序列化优化、连接池）、阿里大规模验证、完整的RPC功能（负载均衡、熔断降级）。Spring Cloud优势：生态完整（配置中心、网关、链路追踪）、多语言支持、与Spring Boot/Spring Cloud Alibaba集成良好。选型建议：1）纯Java团队、追求性能选Dubbo；2）多语言团队、微服务生态选Spring Cloud；3）已有Spring Cloud基础设施选Spring Cloud Alibaba（集成了Dubbo）；4）大规模微服务、性能要求高选Dubbo。两者也可共存，用Dubbo做高性能通信，Spring Cloud做基础设施。"
+          },
+          {
+            "question": "服务挂了怎么发现和剔除？",
+            "answer": "服务发现和剔除机制：1）Zookeeper/Nacos做注册中心，服务启动时注册，心跳检测存活，超过阈值剔除；2）Eureka（已停止维护）客户端侧注册，服务器端同步；3）Consul提供服务健康检查和DNS发现。剔除策略：心跳间隔通常15秒，连续3次失败剔除。实际案例：Dubbo使用Zookeeper作为注册中心，通过Curator客户端实现服务发现和健康检查。剔除后服务恢复时需要重新注册。关键指标：服务不可用时，注册中心应在秒级感知并通知消费者，避免请求打到已下线节点。消费端应实现失败重试和熔断降级。"
+          },
+          {
+            "question": "Dubbo 的执行流程是什么？Invoker 是怎么调用的？",
+            "answer": "Dubbo执行流程分为10步：1）消费端ProxyFactory生成代理对象；2）代理对象经过Filter链（如TokenFilter鉴权）；3）Client编码请求参数（Codec2）；4）ExchangeClient发送请求；5）网络传输；6）服务端ExchangeServer接收；7）服务解码请求；8）Filter链处理（如日志、监控）；9）Invoker调用实际业务；10）结果原路返回。Invoker是核心抽象，代表一个可执行的操作，服务端Invoker调用实际Bean，消费端Invoker发起远程调用。protocol扩展点允许自定义协议实现，如gRPC、Dubbo2。理解Invoker模型是理解Dubbo架构的关键。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q7",
+      "chapterId": "ch3",
+      "number": 7,
+      "title": "Sentinel 的滑动窗口算法？限流规则怎么配置？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "滑动窗口算法原理：\n\nSentinel 将时间切成固定大小的窗口（Bucket），每个窗口独立统计请求数和拒绝数。\n\n例如：1 秒切成 10 个 100ms 窗口\n• Window 1：0-100ms，统计 [0, 100ms) 之间的请求\n• Window 2：100-200ms，统计 [100, 200ms) 之间的请求\n• ...\n\n滑动时计算最近 N 个窗口的总和：\n• 当前时间 450ms，最近的 10 个窗口都有效（0-450ms）\n• 当前时间 1200ms，只有最后 10 个窗口（200-1200ms）有效\n\n这种设计的好处：\n• 无锁实现，性能高\n• 时间精确，统计准确\n• 可以实现任意时间窗口的限流\n\n限流类型：\n• QPS 限流：统计每秒请求数是否超过阈值\n• 并发线程数限流：统计正在执行的线程数\n\n降级策略：\n• RT 降级：平均响应时间超过阈值（默认 5000ms）且请求数>=5，触发降级\n• 异常比例降级：每秒异常比例超过阈值（默认 0.1）\n• 异常数降级：分钟统计异常数超过阈值\n\nSentinel 自适应限流：\n• 根据 CPU 使用率、响应时间、入口 QPS 综合评估\n• 系统 load（系统负载）超过阈值时触发自适应限流\n• 保护系统不被冲垮，而不是简单拒绝",
+        "followUp": [
+          {
+            "question": "Sentinel 的自适应限流怎么实现的？",
+            "answer": "Sentinel自适应限流基于系统负载自适应调节请求通过率。核心原理：采集系统指标（CPU使用率、平均响应时间、入口QPS、线程数），当系统指标超过安全阈值时，自动降低请求通过率保护系统。触发条件：qps大于最大QPS、响应时间大于最大响应时间、系统load大于阈值。自适应限流不是简单拒绝，而是根据系统健康程度按比例放行请求。当CPU使用率大于80%且请求排队大于100时，开始限流。配置项：ms为最大响应时间（默认5000ms）。适用场景：流量突增时保护系统不被冲垮，而不是完全拒绝。自适应限流与固定QPS限流可叠加使用，双重保护。"
+          },
+          {
+            "question": "你们风控系统的限流规则是怎么配置的？",
+            "answer": "风控系统限流配置示例：1）全局QPS限流10万/秒（根据系统容量计算）；2）单用户ID限流100/秒，防止恶意刷接口；3）单接口限流按重要性分级：核心接口（决策）10万QPS，普通接口（查询）5万QPS；4）热点参数限流：同一IP限流1000/秒；5）熔断降级：慢调用比例大于50%持续5秒则熔断10秒。配置实现：使用Sentinel的@SentinelResource注解或Spring Cloud Alibaba Sentinel整合。监控告警：QPS突增200%以上告警，限流触发率大于10%告警。限流降级后的返回码需统一，调用方需做好降级处理。"
+          },
+          {
+            "question": "滑动窗口和令牌桶的区别？",
+            "answer": "滑动窗口和令牌桶是两种限流算法。令牌桶：按固定速率向桶中添加令牌，桶满则丢弃，来了请求就从桶取令牌，有令牌则通过无令牌则拒绝，优势是可以应对突发流量（积累的令牌可以一次性用完）。滑动窗口：将时间分成固定大小的窗口，统计最近N个窗口的总请求数是否超过阈值，优势是统计更精确（令牌桶是统计整个周期，滑动窗口可以实时）。滑动窗口vs计数器：计数器算法简单但有边界突刺问题，滑动窗口平滑。令牌桶vs滑动窗口：令牌桶允许一定突发，滑动窗口更均匀。实际选型：对突发友好的选令牌桶，对精确限流的选滑动窗口。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q8",
+      "chapterId": "ch3",
+      "number": 8,
+      "title": "MyBatis 的一级缓存和二级缓存？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "一级缓存（SqlSession 级别）：\n• 默认开启，无需配置\n• 作用域是同一个 SqlSession（从创建到 close）\n• 同一个 SqlSession 内，执行相同查询（SQL相同、参数相同）时，第二次从缓存取\n• 执行 update/close/clearCache 会清空一级缓存\n• MyBatis 一级缓存是 HashMap 实现，非线程安全\n\n二级缓存（Mapper 级别）：\n• 需要在 Mapper.xml 中配置 <cache/> 开启\n• 跨 SqlSession 共享，多个 SqlSession 可以共享同一个 Mapper 的缓存\n• 缓存基于 namespace（Mapper 接口全限定名）\n• 存储介质：HashMap（自定义缓存）或 Redis（可配置）\n• 非线程安全，需要自行保证并发安全\n\n二级缓存清理时机：\n• 增删改（insert/update/delete）操作会清空该 Mapper 的所有缓存\n• 不想使用缓存：select 标签加 useCache=\"false\"\n• 想每次都查数据库：select 标签加 flushCache=\"true\"\n\n一级和二级缓存优先级：\n• 先查二级缓存（如果命中，直接返回）\n• 二级缓存未命中，查一级缓存\n• 一级缓存未命中，查数据库",
+        "followUp": [
+          {
+            "question": "二级缓存的清理时机？",
+            "answer": "MyBatis二级缓存清理时机：1）增删改操作（insert/update/delete）会清空该namespace下所有缓存；2）select标签flushCache=true会清空缓存；3）缓存满时会按LRU规则淘汰最久未使用的缓存。配置：cache eviction=LRU flushInterval=60000 size=256。 eviction指定淘汰策略（LRU/FIFO/SOFT/WEAK），flushInterval指定刷新间隔（毫秒），size指定缓存数量。二级缓存是与命名空间绑定的，不同namespace的缓存隔离。生产环境注意：多表关联查询时，更新任一表都会清空关联查询的缓存（因为只有该表的namespace被更新），可能导致数据不一致。"
+          },
+          {
+            "question": "一级缓存和二级缓存的优先级？",
+            "answer": "MyBatis缓存查找顺序：先查二级缓存（Mapper级别），未命中再查一级缓存（SqlSession级别），仍未命中则查数据库。二级缓存未命中时，一级缓存有数据则返回；一级缓存也没有，查数据库并写入一级缓存。执行insert/update/delete或调用clearCache()、close()会清空一级缓存；增删改会清空二级缓存。一级缓存是SqlSession私有的，跨SqlSession不可共享；二级缓存是Mapper级别，同一Mapper的多个SqlSession共享。关闭SqlSession后，一级缓存被清空，但二级缓存仍然存在（直到被清理或失效）。"
+          },
+          {
+            "question": "分布式环境下 MyBatis 缓存的问题？",
+            "answer": "分布式环境下MyBatis缓存的问题主要是缓存一致性和缓存雪崩。问题1：本地缓存（一级缓存）无法跨JVM共享，多实例部署时各实例缓存独立，导致数据不一致。解决方案：使用Redis实现分布式缓存替代本地缓存。问题2：二级缓存基于HashMap，非线程安全，多线程访问可能出问题。解决方案：分布式缓存+序列化。问题3：缓存和数据库双写时的一致性问题。解决方案：Cache-Aside模式（先更新数据库，再删除缓存），或使用分布式事务。问题4：缓存雪崩（大量缓存同时过期）。解决方案：设置随机过期时间。生产环境推荐使用Redis做缓存，不依赖MyBatis本地缓存。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch3_q9",
+      "chapterId": "ch3",
+      "number": 9,
+      "title": "MyBatis 的执行器有哪些？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "| 执行器 | 特点 |\n|--------|------|\n| SimpleExecutor | 每次执行都创建一个新的 Statement，用完立即关闭 |\n| ReuseExecutor | 复用 Statement，执行相同 SQL 时重用 PreparedStatement |\n| BatchExecutor | 批量执行，仅对写操作（insert/update/delete）有效，JDBC batch 模式 |\n\n执行流程：\n• SimpleExecutor：openStatement() → 设置参数 → 执行 → 关闭Statement\n• ReuseExecutor：用 Map<SQL, PreparedStatement> 缓存，执行前先查缓存\n• BatchExecutor：攒 SQL → 批量 execute() → 清理缓存\n\n执行器选择：\n• 默认是 SIMPLE\n• BatchExecutor 用于批量插入优化（注意 flushStatements() 和事务提交）\n• ReuseExecutor 用于高频执行相同 SQL 的场景\n\nMyBatis 插件机制（四大扩展点）：\n• Executor：执行 SQL 的方法（update/query/flushStatements/close 等）\n• StatementHandler：处理 SQL 语句（prepare/parameterize/batch/update/query）\n• ParameterHandler：处理参数（getParameterObject/setParameters）\n• ResultSetHandler：处理结果集（handleResultSets/handleOutputParameters）\n\n插件执行顺序：\n• Executor（先） → StatementHandler → ParameterHandler → ResultSetHandler（后）\n• 多插件时按责任链模式层层调用",
+        "followUp": [
+          {
+            "question": "这些执行器在什么场景下选择？",
+            "answer": "SimpleExecutor适用场景：简单的一次性查询，用完立即关闭，资源及时释放。ReuseExecutor适用场景：高频执行相同SQL的批处理操作，通过复用PreparedStatement减少编译次数，适合批量查询场景。BatchExecutor适用场景：大量写操作（insert/update/delete），通过JDBC batch机制减少网络往返，提升批量写入性能10倍以上。使用示例：批量插入1万条记录，普通插入需要30秒，BatchExecutor 5秒，LOAD DATA INFILE 1秒。MyBatis默认使用SimpleExecutor，可通过设置type属性切换。实际项目中，ReuseExecutor在高频相同SQL查询中有明显优势，BatchExecutor在ETL批量数据处理中常用。"
+          },
+          {
+            "question": "MyBatis 的插件机制？有哪些扩展点？",
+            "answer": "MyBatis插件通过拦截器链实现四大扩展点：Executor（执行SQL的方法，如update/query/close）、StatementHandler（处理SQL语句，如prepare/parameterize/batch）、ParameterHandler（处理参数，如getParameterObject/setParameters）、ResultSetHandler（处理结果集）。执行顺序：Executor→StatementHandler→ParameterHandler→ResultSetHandler。插件实现：实现Interceptor接口，添加@Intercepts注解指定拦截的方法签名，在intercept方法中编写增强逻辑。应用场景：分页插件（拦截query方法）、SQL日志打印（拦截prepare方法）、性能监控。注意事项：插件会改变执行流程，过多插件会影响性能；插件间可能存在依赖关系。"
+          },
+          {
+            "question": "你们批量插入用过什么优化？",
+            "answer": "批量插入优化经验：1）MyBatis BatchExecutor，JDBC batch模式，减少网络往返；2）JDBC rewriteBatchedStatements=true，重写SQL减少解析开销；3）手动拼接批量INSERT VALUES减少SQL条数（每条1000行左右）；4）分批提交，避免大事务；5）使用LOAD DATA INFILE（MySQL专属）性能最高。实测数据：10万条记录，普通插入需要30秒，BatchExecutor 5秒，LOAD DATA INFILE 1秒。注意事项：batchSize参数控制批处理大小；flushStatements()需要在事务提交前调用；数据库连接池需足够大支持batch模式。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q1",
+      "chapterId": "ch4",
+      "number": 1,
+      "title": "MySQL 的索引结构？为什么用 B+ 树而不是 B 树/红黑树？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "B+ 树 vs B 树：\n• B+ 树只有叶子节点存储数据，非叶子节点只存索引（冗余索引）\n• B 树的每个节点都存储数据\n• B+ 树的非叶子节点不存储 data，可以容纳更多索引，树的层级更浅\n• B+ 树叶子节点通过链表连接，范围查询友好（只需遍历链表）\n• B 树范围查询需要中序遍历，效率低\n\nB+ 树 vs 红黑树：\n• 红黑树是二叉查找树，高度不可控，最坏情况深度 = O(log n)\n• 但 MySQL 数据量巨大时，红黑树深度可能达到 20 层以上\n• 每层是一次磁盘 IO，红黑树会产生大量磁盘 IO\n• B+ 树每个节点是一个磁盘页（通常 16KB），非叶子节点可以存储大量索引\n• 深度 3-4 层的 B+ 树即可支撑千万级数据\n\nMySQL InnoDB 使用 B+ 树作为索引结构：\n• 主键索引（聚簇索引）：叶子节点存储完整行数据\n• 辅助索引：叶子节点存储主键值，查询时需要回表\n• 覆盖索引：查询的列全部在辅助索引中，无需回表",
+        "followUp": [
+          {
+            "question": "聚簇索引和非聚簇索引的区别？",
+            "answer": "聚簇索引（Clustered Index）的叶子节点存储完整行数据，按主键顺序排列，一张表只能有一个聚簇索引；非聚簇索引（Secondary Index）的叶子节点存储主键值，查询时需要回表（先查索引找到主键，再查聚簇索引获取完整数据）。InnoDB主键索引就是聚簇索引，辅助索引都是非聚簇索引。覆盖索引是指查询的列全部在辅助索引中，无需回表，可显著提升查询性能。MyISAM索引都是非聚簇索引，叶子节点存储数据行地址。选型建议：主键应使用自增ID或趋势递增的值，避免随机主键导致频繁的页分裂和碎片。"
+          },
+          {
+            "question": "什么情况下索引会失效？",
+            "answer": "索引失效的常见情况：1）索引列参与计算，如WHERE age+1=20；2）索引列使用函数，如WHERE YEAR(create_time)=2023；3）LIKE以%开头，如WHERE name LIKE '%张%'；4）OR连接非索引列，如WHERE name='张三' OR age=20（age无索引）；5）类型不匹配，如字符串字段用数字查询WHERE id='123'（隐式转换）；6）最左前缀中断，如联合索引(a,b,c)但WHERE b=1；7）数据量过小时优化器选择全表扫描。解决方案：用索引列直接参与计算或比较；使用函数索引；避免在索引列上使用函数；LIKE改为前置匹配或使用全文索引；拆分OR为UNION；确保类型匹配。"
+          },
+          {
+            "question": "最左前缀原则是什么？",
+            "answer": "最左前缀原则是指复合索引从最左边的列开始使用，依次向右，中间的列不能跳过。举例：索引(a,b,c)可以支持的查询组合：a、ab、abc；不能只有b或bc（索引失效）。原理：B+树按索引列顺序组织数据，必须从第一列开始连续使用才能命中索引。设计索引时的原则：1）把区分度高的列放前面；2）考虑查询频率，将高频查询列放前面；3）查询条件顺序不影响索引命中，索引顺序才影响。举例：常按a查就以a开头，常按a,b查就以a,b开头。违反最左前缀的例子：索引(name,age,gender)，查询WHERE age=20则不命中索引。"
+          },
+          {
+            "question": "如何分析一条 SQL 是否走了索引？",
+            "answer": "分析SQL是否走索引的方法：1）EXPLAIN查看执行计划，type列：ref/range/const表示走索引，ALL表示全表扫描；2）key列显示实际使用的索引；3）rows列显示扫描行数，越少越好；4）extra列：Using index表示覆盖索引，Using filesort表示需要排序，Using temporary表示需要临时表。关键指标：type为ALL最差（必须优化），type为range开始变好。常见问题：LIKE '%xxx'导致全表扫描；OR条件中有无索引列导致全表扫描；数据类型隐式转换导致索引失效。优化手段：添加合适索引；使用覆盖索引避免回表；拆分为多个查询再合并结果。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q2",
+      "chapterId": "ch4",
+      "number": 2,
+      "title": "MySQL 的事务隔离级别？各解决什么问题？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "| 隔离级别 | 脏读 | 不可重复读 | 幻读 |\n|----------|------|------------|------|\n| Read Uncommitted | ✓ 可能 | ✓ 可能 | ✓ 可能 |\n| Read Committed | ✗ 不可能 | ✓ 可能 | ✓ 可能 |\n| Repeatable Read | ✗ 不可能 | ✗ 不可能 | ✓ 可能（快照读） |\n| Serializable | ✗ 不可能 | ✗ 不可能 | ✗ 不可能 |\n\n脏读：一个事务读取到另一个事务未提交的数据\n不可重复读：同一行数据，在同一个事务中多次读取结果不一致（因为其他事务修改并提交了）\n幻读：同一查询在事务中执行两次，第二次看到其他事务插入的新行（记录数不同）\n\nMVCC 机制（Multi-Version Concurrency Control）：\n• 每行数据有隐式主键（DB_ROW_ID）和两个系统列：\n  - DB_TRX_ID：最近一次修改该行的事务 ID\n  - DB_ROLL_PTR：指向 undo log 的指针，用于回滚\n• 每行还有两个隐藏列：\n  - 创建版本号\n  - 删除版本号（如果该行被删除，标记删除版本号）\n• 快照读 vs 当前读：\n  - 快照读：读取历史版本，不加锁（SELECT * FROM ...）\n  - 当前读：读取最新数据，加锁（SELECT * FROM ... FOR UPDATE / INSERT / UPDATE / DELETE）\n\nRepeatable Read 下如何解决不可重复读？\n• 事务开始时生成 ReadView（一致性视图）\n• ReadView 包含：活跃事务列表（m_ids）、最小活跃事务 ID（min_trx_id）、最大活跃事务 ID（max_trx_id）、当前事务 ID（creator_trx_id）\n• 读取时：找创建版本 <= 当前事务ID，且删除版本不存在或 > 当前事务ID 的行",
+        "followUp": [
+          {
+            "question": "InnoDB 的 MVCC 是怎么实现的？",
+            "answer": "InnoDB的MVCC通过ReadView实现。RR级别下事务开始时生成ReadView，之后所有快照读都基于这个ReadView，即使其他事务提交了修改也看不到。RC级别下每次快照读都生成新的ReadView。"
+          },
+          {
+            "question": "快照读和当前读的区别？",
+            "answer": "快照读读取历史版本，不加锁，用于查询（SELECT * FROM ...）。当前读读取最新数据，加锁，用于写操作（SELECT * FROM ... FOR UPDATE、INSERT、UPDATE、DELETE）。MVCC配合两阶段锁实现并发控制。"
+          },
+          {
+            "question": "幻读在什么场景下会出现？怎么解决？",
+            "answer": "这个问题考察的是MySQL 的事务隔离级别？各解决什么问题？相关的深度理解。幻读在RR级别下通过MVCC解决（快照读看不到其他事务的新增），但当前读时仍需加锁防止幻读。InnoDB使用间隙锁锁定索引记录间的间隙，防止其他事务在范围内插入新记录。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "你们用的什么隔离级别？",
+            "answer": "这个问题考察的是MySQL 的事务隔离级别？各解决什么问题？相关的深度理解。项目使用RC或RR级别。RC下每次读取都生成新ReadView，可能看到其他事务已提交的修改；RR下整个事务使用同一个ReadView，保证多次读取结果一致。大部分业务用RR即可。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q3",
+      "chapterId": "ch4",
+      "number": 3,
+      "title": "MVCC 在 RR 级别下是怎么解决不可重复读的？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "核心原理：事务开始时生成 ReadView，之后所有读取都基于这个 ReadView。\n\nReadView 包含：\n• m_ids：活跃事务 ID 列表（已开启但未提交的事务）\n• min_trx_id：活跃事务中的最小 ID\n• max_trx_id：活跃事务中的最大 ID + 1（下一个将分配的事务 ID）\n• creator_trx_id：当前事务的事务 ID\n\n读取规则：\n• 对于每行数据，找到创建版本 <= creator_trx_id 的最新版本\n• 同时该版本的删除版本号要么不存在，要么 > creator_trx_id\n• 这样就能读到事务开始时的数据快照\n\nRR 级别下的具体流程：\n1. 事务 T1 开启，生成 ReadView，假设 m_ids = [50, 60]，min_trx_id = 50，max_trx_id = 61，creator_trx_id = 50\n2. 事务 T2（ID=60）修改了某行数据并提交\n3. T1 再次读取同一行：因为该行的最新修改版本的事务ID=60，在 m_ids 中，且 60 >= min_trx_id && 60 < max_trx_id，所以不可见\n4. T1 继续沿 undo log 回滚，找到创建版本 <= 50 的版本，返回\n5. 结果：T1 多次读取返回相同数据，解决不可重复读",
+        "followUp": [
+          {
+            "question": "RC 级别下 ReadView 什么时候生成？",
+            "answer": "Read Committed（RC）隔离级别下，ReadView在每次快照读（SELECT）时生成新的，而不是事务开始时生成。这意味着同一事务中的多次查询可能看到不同的数据（因为其他事务可能在这期间提交并修改了数据）。具体流程：事务T1执行SELECT 1时生成ReadView1，此时其他事务T2还未提交，所以看不到T2的修改；T1执行SELECT 2时生成ReadView2，此时T2已提交，所以能看到T2的修改。RC解决了脏读（不会读到未提交的数据），但无法解决不可重复读。相比RR，RC更适合需要看到最新已提交数据的场景，但需要注意同一事务中数据可能变化。"
+          },
+          {
+            "question": "undo log 是什么时候产生的？",
+            "answer": "undo log在事务开始修改数据时产生，记录了数据修改前的值。当事务对数据进行INSERT/UPDATE/DELETE操作时，InnoDB会先将旧值写入undo log，以便事务回滚和MVCC快照读取。undo log存储位置：系统表空间（MySQL 5.7之前）或undo表空间（MySQL 8.0+）。undo log类型：insert undo log（INSERT操作，事务提交后可立即删除）；update undo log（UPDATE/DELETE操作，在MVCC中还需要用到，事务提交后标记为不活跃，等待 purge 线程清理）。undo log记录的是被修改行的旧值，通过DB_ROLL_PTR指针关联。当行被删除时，delete mark操作写入undo log，实际删除由purge线程完成。"
+          },
+          {
+            "question": "ReadView 的 m_ids 是怎么维护的？",
+            "answer": "ReadView的m_ids（活跃事务ID列表）由InnoDB的事务系统维护。每个事务开始时向事务ID分配器申请事务ID，已开启但未提交的事务ID被记录到全局活跃事务列表中。ReadView生成时，复制当前活跃事务列表作为m_ids，同时记录min_trx_id（最小活跃事务ID）和max_trx_id（最大活跃事务ID+1）。事务提交后从活跃列表中移除，其修改对其他事务可见。purge线程定期清理不再需要的undo log。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q4",
+      "chapterId": "ch4",
+      "number": 4,
+      "title": "MySQL 什么时候会锁表？什么情况下会行锁升级？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "行锁升级为表锁的场景：\n\n1. SQL 没有命中索引\n   • 全表扫描时，InnoDB 会把整张表锁住\n   • 解决：确保查询走索引\n\n2. 锁定的数据量超过阈值\n   • InnoDB 有一个锁升级阈值（lock_row_lock_weight 默认 2000000）\n   • 当累计锁开销超过这个值时，会升级为表锁\n\n3. 间隙锁（Gap Lock）在高并发场景\n   • RR 隔离级别下，InnoDB 会锁定索引记录之间的间隙，防止幻读\n   • 如果一个间隙被大量并发 SQL 锁定，可能导致表锁\n\n4. 显式 lock tables（应用层命令）\n\ngap 锁（间隙锁）：\n• 在索引记录之间的间隙加锁\n• 锁定的是一个范围，不是单行\n• 目的是防止幻读（防止其他事务在范围内插入新记录）\n• 只在 RR 隔离级别下生效\n\n示例：SELECT * FROM users WHERE age BETWEEN 10 AND 30 FOR UPDATE\n• 如果 age 有索引，锁住 age in (10, 30) 之间的所有记录\n• 其他事务无法在 10-30 这个范围插入新记录\n\n死锁排查：\n• SHOW ENGINE INNODB STATUS：查看最近一次死锁信息\n• information_schema.INNODB_LOCKS：查看当前锁\n• information_schema.INNODB_TRX：查看当前事务",
+        "followUp": [
+          {
+            "question": "死锁是怎么产生的？怎么排查和解决？",
+            "answer": "死锁产生条件：多个事务循环等待对方持有的锁。典型场景：事务A锁住记录1等待记录2，事务B锁住记录2等待记录1。MySQL InnoDB采用两阶段锁协议（修改数据前申请锁，事务结束才释放锁），加上行锁的逐行申请机制，容易产生死锁。产生条件：1）互斥：资源只能被一个事务持有；2）持有并等待：持有资源的同时等待其他资源；3）不可抢占：资源不能被强制释放；4）循环等待：事务间形成等待环。死锁解决：InnoDB会自动检测死锁（等待图算法），选择回滚undo log最少的事务。解决方式：SHOW ENGINE INNODB STATUS查看死锁信息，分析两个事务的加锁顺序，按相同顺序访问资源。"
+          },
+          {
+            "question": "你们项目里遇到过死锁吗？怎么处理的？",
+            "answer": "项目中死锁排查经验：1）通过SHOW ENGINE INNODB STATUS查看最近死锁详情，包含两个事务的SQL和加锁顺序；2）分析死锁原因：通常是两个事务以不同顺序访问相同资源；3）解决：统一资源访问顺序；4）预防：减少锁范围（用覆盖索引减少锁行数）、减少事务时长（避免在事务中做远程调用）。案例：两个更新操作分别先更新用户表再更新订单表，以不同顺序执行导致死锁，统一为先用户后订单后解决。监控：开启innodb_print_all_deadlocks记录所有死锁到错误日志。"
+          },
+          {
+            "question": "什么是意向锁？IX 和 IS 是做什么的？",
+            "answer": "这个问题考察的是MySQL 什么时候会锁表？什么情况下会行锁升级？相关的深度理解。意向锁是表级锁，IX表示事务想要获取某行的排他锁，IS表示事务想要获取某行的共享锁。作用是在加行锁前快速判断是否有其他事务锁住了整张表，避免逐行检查。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q5",
+      "chapterId": "ch4",
+      "number": 5,
+      "title": "Redis 的数据类型？各适合什么场景？",
+      "difficulty": "basic",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "| 数据类型 | 使用场景 |\n|----------|----------|\n| String | 缓存、计数器、分布式锁（SET NX EX）、简单字符串 |\n| Hash | 对象存储（用户信息、商品信息）、购物车 |\n| List | 消息队列（LPUSH + BRPOP）、任务队列、排行榜、关注列表 |\n| Set | 标签（去重）、好友关系、共同好友、去重统计 |\n| ZSet（Sorted Set）| 排行榜（带分数排序）、延迟队列（ZREMRANGEBYSCORE）、权重队列 |\n| Bitmap | 用户签到、状态标记（0/1）、UV 统计（独立访客） |\n| HyperLogLog | 统计 UV（独立访客）、DAU、DAU 波动监控 |\n| GEO | 附近的人、LBS 位置服务、打车匹配司机 |\n\nString 底层实现（SDS 简单动态字符串）：\n• 预分配内存：小于 1MB 时 double 扩容，大于 1MB 时每次 +2MB\n• 惰性释放：删除时不立即释放内存，用惰性空间释放统计\n• 二进制安全：可以存储任意二进制数据，不受 \\0 影响\n• 记录长度：len 字段记录字符串长度，O(1) 获取长度\n\nZSet 实现原理：\n• 跳跃表（Skip List）：多层链表，高层是低层的子集，提供 O(log n) 查找\n• 同时维护一个 HashMap 存储 member → score 映射，用于 O(1) 定位 member\n• 当元素超过 128 个或单个元素超过 64 字节时，转为 ziplist 压缩列表存储",
+        "followUp": [
+          {
+            "question": "ZSet 的实现原理？跳跃表？",
+            "answer": "这个问题考察的是Redis 的数据类型？各适合什么场景？相关的深度理解。ZSet使用跳跃表实现有序查找，跳跃表是一种多层链表，高层是低层的子集，通过稀疏索引实现O(log n)查找。同时用HashMap存储member到score的映射，实现O(1)查找member。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "String 的底层实现？SDS？",
+            "answer": "这个问题考察的是Redis 的数据类型？各适合什么场景？相关的深度理解。SDS是Redis的字符串实现，比C字符串多了len和free字段。优势：1）O(1)获取长度；2）防止缓冲区溢出；3）二进制安全；4）惰性释放减少开销；5）预分配策略减少内存重分配。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "HyperLogLog 的原理？为什么能节省内存？",
+            "answer": "这个问题考察的是Redis 的数据类型？各适合什么场景？相关的深度理解。HyperLogLog基于概率统计，通过哈希函数将元素映射到二进制串，观察串中首个1出现的位置来估算基数。优势是只需12KB内存就能统计2^64个独立元素，标准误差约0.81%，适合UV统计。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q6",
+      "chapterId": "ch4",
+      "number": 6,
+      "title": "Redis 的持久化机制？RDB 和 AOF 的区别？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "RDB（Redis Database）：\n• 定时快照：将某个时间点的内存数据完整保存\n• 实现：fork 子进程，COW（Copy On Write）机制，子进程遍历内存写入 RDB 文件\n• 优点：文件紧凑，恢复速度快（直接加载）\n• 缺点：可能丢失最后一次快照后的数据\n\nAOF（Append Only File）：\n• 记录每个写命令到文件\n• 重写机制：定期根据最新内存数据生成最小命令集，重写后替换旧 AOF 文件\n• 优点：数据安全性更高，配置 always 时不丢失数据\n• 缺点：文件体积大，恢复速度慢（逐条执行）\n\nAOF 三种策略：\n• always：每个写命令都同步写入磁盘（最多丢失一条）\n• everysec（推荐）：每秒同步一次（最多丢失一秒数据）\n• no：交给操作系统决定（可能丢失较多数据）\n\n混合持久化（RDB + AOF）：\n• Redis 4.0 引入\n• AOF 重写时，先以 RDB 格式写入 AOF，再追加增量 AOF 命令\n• 恢复时先加载 RDB 部分，再执行增量命令\n• 兼顾恢复速度和安全性\n\n主从复制时：\n• 从节点全量同步：主节点 BGSAVE 生成 RDB，发送给从节点\n• 从节点加载 RDB 后，主节点再发送这期间的写命令（buffer）",
+        "followUp": [
+          {
+            "question": "Redis 4.0 后的混合持久化？",
+            "answer": "混合持久化是Redis 4.0引入的特性，结合RDB和AOF优点。AOF重写时，先以RDB格式写入当前内存数据（AOF混用BGSAVE的rdb内容），再追加增量AOF命令。恢复时先加载RDB部分，再执行增量命令。优势：RDB部分恢复速度快（秒级），AOF部分保证不丢失最近数据。配置：aof-use-rdb-preamble yes。适用场景：数据量大、既想快速恢复又想保证数据完整性的场景。相比纯AOF，混合持久化文件更紧凑、恢复更快；相比纯RDB，数据完整性更高。"
+          },
+          {
+            "question": "主从复制机制？",
+            "answer": "主从复制流程：1）从节点发送PSYNC ? -1（全量同步）；2）主节点响应FULLRESYNC并执行BGSAVE生成RDB；3）主节点发送RDB文件给从节点；4）从节点收到RDB清空本地数据；5）主节点发送buffer中的增量命令；6）从节点执行追平。增量同步：主节点维护repl_backlog_buffer环形缓冲区（默认1MB），记录每个写命令的offset。从节点断线重连时，发送PSYNC run_id offset，主节点检查offset是否还在buffer中，在则发送增量，否则全量同步。配置：replica-serve-stale-data yes允许从节点在主从延迟期间返回旧数据。"
+          },
+          {
+            "question": "AOF 重写是什么时候触发的？",
+            "answer": "AOF重写触发条件：1）手动触发：BGREWRITEAOF命令；2）自动触发：aof_current_size大于auto_aofrewrite_min_size且增长比例超过100%（默认）。auto_aofrewrite_min_size默认64MB。触发时，Redis fork子进程执行AOF重写，遍历内存数据生成最小命令集，写入临时文件后替换旧AOF文件。重写过程中，新命令追加到旧AOF文件和重写buffer（重写完成后追加到新AOF）。风险：fork期间父进程内存翻倍（COW机制）；重写大AOF文件耗时较长。优化：配置auto-aof-rewrite-percentage和auto-aofrewrite-min-size调整触发时机。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q7",
+      "chapterId": "ch4",
+      "number": 7,
+      "title": "Redis 的过期策略和淘汰策略？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "过期策略（删除过期的 key）：\n\n1. 定时删除\n   • 设置定时器，过期立即删除\n   • 优点：内存友好，键一过期立即删除\n   • 缺点：CPU 开销大，如果大量 key 同时过期，CPU 要花时间处理定时器\n\n2. 惰性删除（懒过期）\n   • 访问 key 时检查是否过期，过期则删除\n   • 优点：CPU 友好，只有访问时才检查\n   • 缺点：内存不友好，过期 key 可能一直不被访问，堆积在内存\n\n3. 定期删除（Redis 实际使用）\n   • 每秒随机抽取设置了过期时间的 key 检查删除\n   • 限制删除频率和时长，避免阻塞\n   • 是定时删除和惰性删除的平衡方案\n\n淘汰策略（内存满时）：\n• noeviction（默认）：不淘汰，返回错误\n• allkeys-lru：从所有 key 中 LRU 淘汰\n• volatile-lru：从设置了过期时间的 key 中 LRU 淘汰\n• allkeys-random：从所有 key 中随机淘汰\n• volatile-random：从设置了过期时间的 key 中随机淘汰\n• allkeys-lfu：从所有 key 中 LFU 淘汰\n• volatile-lfu：从设置了过期时间的 key 中 LFU 淘汰\n• volatile-ttl：淘汰 TTL 最短的 key\n\n缓存穿透、缓存雪崩、缓存击穿：\n• 穿透：查询不存在的 key，布隆过滤器或缓存空值\n• 雪崩：大量 key 同时过期，均匀过期时间 + 熔断降级\n• 击穿：热点 key 过期，大量并发打到数据库，分布式锁或永不过期策略",
+        "followUp": [
+          {
+            "question": "你们 Redis 用的什么淘汰策略？为什么？",
+            "answer": "Redis淘汰策略选型：volatile-lru（从设置过期时间的key中LRU淘汰）适合有明确过期时间的缓存场景，如临时会话、验证码；allkeys-lru适合无过期时间的缓存，如热点数据预加载；noeviction（默认）适合纯存储型用途，不淘汰但会返回错误。选择依据：业务是否允许冷数据被淘汰；数据是否有明确的过期时间。生产环境经验：缓存类场景用volatile-lru或allkeys-lru，存储类场景用noeviction。监控：slowlog get 10查看慢查询，INFO stats的evicted_keys统计淘汰次数。"
+          },
+          {
+            "question": "缓存穿透、缓存雪崩、缓存击穿是什么？怎么处理？",
+            "answer": "这个问题考察的是Redis 的过期策略和淘汰策略？相关的深度理解。缓存穿透指查询不存在的数据，解决方案：1）布隆过滤器快速判断key是否存在；2）缓存空值（设置较短过期时间）；3）接口层校验。穿透会让大量不存在请求打到数据库。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "LFU 和 LRU 的区别？",
+            "answer": "这个问题考察的是Redis 的过期策略和淘汰策略？相关的深度理解。项目使用allkeys-lru淘汰策略，内存满时淘汰最近最少使用的key。LRU算法简单但无法区分热点，一段时间内的热点可能因时间久远被淘汰。LFU记录访问频率，更适合长期热点场景。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q8",
+      "chapterId": "ch4",
+      "number": 8,
+      "title": "Codis 和 Redis Cluster 的区别？你们用的哪个？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "Codis（豌豆荚开源）：\n• Proxy-based 方案：客户端连 Proxy，Proxy 转发到后端 Redis\n• 有 Dashboard 管理界面，运维友好\n• 支持跨机房迁移\n• 台湾 digun、CodisLab 维护，社区活跃度已下降\n• 特点：后端是普通 Redis（单机或主从），Proxy 层做分片\n\nRedis Cluster：\n• 无 Proxy：客户端直接连接节点（Smart Client）\n• 去中心化：节点间通过 Gossip 协议通信，自动发现和故障转移\n• 槽位分配：16384 个槽，平均分配到多个节点\n• 官方维护，原生支持\n• 缺点：槽位迁移期间部分 key 无法访问（Redirection），运维复杂\n\n跨 Slot 的 MSET/MGET：\n• Codis：Proxy 拆解命令，发送到多个后端 Redis，再合并结果\n• Redis Cluster：不支持跨 Slot 操作，会报错（CROSSSLOT Keys in command touching multiple slots）\n\n选型建议：\n• 运维能力强、追求官方支持 → Redis Cluster\n• 运维能力弱、喜欢图形化界面 → Codis\n• 如果数据量不大（< 1TB），可以先考虑 Codis 或 Twemproxy",
+        "followUp": [
+          {
+            "question": "你们的数据量有多大？怎么决定用哪种方案？",
+            "answer": "风控系统Redis数据量约50GB，使用Redis Cluster 12节点（3主3从）。数据量不大时Codis足够，大数据量或对性能要求高时选Redis Cluster。需要提前规划好slot分配和迁移方案。"
+          },
+          {
+            "question": "跨 Slot 的 MSET/MGET 怎么处理的？",
+            "answer": "这个问题考察的是Codis 和 Redis Cluster 的区别？你们用的哪个？相关的深度理解。Codis通过Proxy拆解跨slot命令，合并结果返回；Redis Cluster不支持跨slot操作会报错。实际项目中通过相同业务key哈希到相同slot解决，或拆分为多个单slot命令。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Redis Cluster 的槽位是怎么分配的？",
+            "answer": "Redis Cluster将整个键空间划分为16384个槽（slot），每个节点负责一部分槽。槽分配方式：1）手动指定：CLUSTER ADDSLOTS命令逐槽分配；2）自动分配：CLUSTER MEET加入集群后，16384个槽自动平均分配到主节点。槽信息存储在每个节点的本地，同时通过Gossip协议在集群间同步。客户端缓存槽位信息以实现高效路由。槽迁移：使用CLUSTER SETSLOT slot MIGRATING/IMPORTING命令，迁移过程中该槽可正常读写，但请求可能被MOVED重定向。键的槽计算：CRC16(key) mod 16384。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q9",
+      "chapterId": "ch4",
+      "number": 9,
+      "title": "Redis 主从复制原理？全量同步和增量同步？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "全量同步（从节点第一次加入或断线后重连）：\n\n1. 从节点发送 PSYNC ? -1（端口或 RUN_ID 未知，发全量同步）\n2. 主节点响应 FULLRESYNC <run_id> <offset>\n3. 主节点执行 BGSAVE 生成 RDB（同时用 buffer 记录这期间的写命令）\n4. BGSAVE 完成后，主节点发送 RDB 文件给从节点\n5. 从节点收到 RDB，清空内存，加载 RDB\n6. 主节点再发送 buffer 里的写命令（replication buffer）\n7. 从节点执行这些命令，追平到主节点当前状态\n\n增量同步（部分同步，从节点只是短暂断开）：\n\n1. 从节点发送 PSYNC <run_id> <offset>（带上主节点 run_id 和自己的 offset）\n2. 主节点检查 offset 是否还在 repl_backlog_buffer 中\n3. 如果在，从主节点发送 offset 之后的命令给从节点\n4. 从节点执行这些命令，追平状态\n\nrepl_backlog_buffer（复制积压缓冲区）：\n• 主节点维护的一个环形缓冲区，默认 1MB\n• 主节点所有写命令都会追加到这个 buffer\n• 缓冲区记录了每个命令对应的 offset\n• 从节点断开时间超过缓冲区大小，只能做全量同步\n\n主从切换（故障转移）：\n• 哨兵（Sentinel）监控主节点健康状态\n• 主节点宕机后，哨兵选举出新的主节点\n• 从节点指向新主节点，完成故障转移\n• 哨兵集群自身也互相监控，保证高可用",
+        "followUp": [
+          {
+            "question": "主从切换的时候怎么保证数据不丢？",
+            "answer": "主从切换数据安全保证：1）半同步复制（semi-sync）：主节点等待至少一个从节点确认写入后再响应客户端，通过rpl-semi-sync-master-requires-at-least-1参数配置；2）wait命令：强制将请求等待指定数量的从节点确认；3）配置min-slaves-to-write和min-slaves-max-lag确保从节点数量和延迟达标；4）取消非同步副本选举（unclean.leader.election.enable=false）防止数据丢失。切换流程：Sentinel检测到主节点不可达后，选举新主节点，从节点指向新主节点并全量同步。关键：主节点写入要确保至少一个从节点写入成功。"
+          },
+          {
+            "question": "哨兵模式了解吗？选举过程？",
+            "answer": "哨兵（Sentinel）是Redis的高可用方案，由一个或多个Sentinel实例组成，负责监控主从节点健康状态、故障检测、自动选主和通知。哨兵通过发布订阅机制互相发现，组成哨兵集群。故障检测：主观下线（单个哨兵认为主节点不可达）→客观下线（多数哨兵都认为不可达）→选举领头的哨兵→从节点向主节点发起选举。选主依据：优先级（replica-priority配置）、偏移量（数据完整性）、runid（启动顺序，先启动runid更小）。通知：故障转移完成后，通过发布订阅通知客户端。哨兵需要至少3个实例且最好分布在不同机器上，通过quorum参数控制客观下线的判定。"
+          },
+          {
+            "question": "为什么主从复制是异步的？",
+            "answer": "这涉及到系统设计的核心权衡。以线程池为例，核心参数（corePoolSize、maxPoolSize、queueCapacity）需要根据业务负载特点（CPU密集/IO密集）、峰值QPS、平均耗时来综合计算，确保性能最优且资源可控。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q10",
+      "chapterId": "ch4",
+      "number": 10,
+      "title": "HBase 的 RowKey 设计原则？为什么要散列？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "RowKey 设计原则：\n\n1. 长度原则\n   • 最大 10 字节，最优 16 字节以内\n   • RowKey 存在每个 HFile 中，太长会占内存\n   • 建议定长，不足补零（可以用 MD5 哈希固定长度）\n\n2. 唯一原则\n   • 必须唯一定位一行数据\n   • 类比 MySQL 主键\n\n3. 散列原则（最重要的原则）\n   • 避免热点（Hot Spot）：所有数据集中写入某个少数 Region，导致读写热点\n   • 热点 Region 会导致性能瓶颈，其他 Region 空闲\n\n避免热点的三种方法：\n\n1. 加盐（Salting）\n   • 在 RowKey 前面加随机前缀（0-9）\n   • 原始 key：key001 → 盐后：0_key001, 1_key001, 2_key001\n   • 写入时分散到不同 Region，但查询时要遍历\n\n2. 哈希（Hashing）\n   • 对原始 key 做 MD5 或其他哈希，取前几位作为前缀\n   • MD5(key).substring(0, 4)_原始key\n   • 分散均匀，但查询时要预计算\n\n3. 反转（Reversing）\n   • 手机号 13812345678 → 反转 87654321891\n   • 适合以固定前缀开头（如时间戳、业务ID）的 key\n   • 简单有效",
+        "followUp": [
+          {
+            "question": "HBase 的 WAL 机制？",
+            "answer": "WAL（Write-Ahead Logging）是HBase的写操作保障机制。流程：客户端写数据时，先追加到WAL（存储在HDFS），写入成功后再写MemStore。MemStore写满后刷写到HDFS成为HFile。如果RegionServer宕机，WAL可以重放还未刷写到HFile的数据，恢复未持久化的写操作。WAL配置：put.setWriteToWAL(false)可跳过WAL（但不推荐，可能丢数据）；批量写时可考虑关闭WAL提升性能但需自行保证数据不丢。WAL存储路径：/hbase/WALs/regionserver/。WAL的滚动和清理由HBase后台线程管理，过期的WAL会被删除以回收空间。"
+          },
+          {
+            "question": "Region 什么时候会分裂？",
+            "answer": "HBase Region分裂时机：1）自动分裂，当MemStore刷写后形成的HFile大小超过配置阈值（hbase.hregion.max.filesize，默认10GB）；2）手动分裂，管理员执行split命令强制分裂。分裂过程：父Region标记为spliting状态，同时在HDFS创建子Region目录；数据在父Region和子Region之间按中间rowkey分割；分裂完成后，父Region下线，子Region上线。分裂是HBase自动扩容的核心机制。优化：预分区（create table时指定split keys）可避免自动分裂带来的性能抖动；大表分裂会影响读写延迟，建议在业务低峰期操作。"
+          },
+          {
+            "question": "HBase 和 MySQL 的适用场景？",
+            "answer": "HBase适用场景：1）海量数据存储（十亿行级别以上）；2）宽表设计（列数很多但行数少）；3）高并发随机写（写优化存储引擎）；4）只需单行读写，不需要复杂JOIN。MySQL适用场景：1）中小规模数据（亿级以下）；2）强事务需求（ACID）；3）复杂查询和JOIN；4）需要二级索引、全文检索。核心区别：HBase是列式NoSQL，无事务无JOIN，横向扩展简单；MySQL是关系型，支持SQL，垂直扩展为主。实际架构：HBase存海量原始数据，MySQL存结构化业务数据，需要时通过应用层关联。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q11",
+      "chapterId": "ch4",
+      "number": 11,
+      "title": "MongoDB 的适用场景？和 MySQL 的区别？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "MongoDB 适用场景：\n• 无固定 Schema，业务快速迭代，字段经常变化（如用户画像、商品属性）\n• 高并发读写（写入性能高）\n• 高可用、副本集（自动故障转移）\n• 存储文档型数据（JSON-like）\n• 需要存储大量小文件\n• 需要水平扩展（分片）\n\nMySQL vs MongoDB 对比：\n\n| 对比 | MySQL | MongoDB |\n|------|-------|---------|\n| 数据模型 | 关系型，行列分明 | 文档型，嵌套文档 |\n| 事务 | 支持跨表跨行事务 | 单文档事务（4.0+ 支持多文档事务）|\n| JOIN | 支持 JOIN | 不支持 JOIN，用嵌入文档代替 |\n| 索引 | B+Tree | B-Tree（默认），还支持地理空间、文本索引 |\n| 扩展性 | 垂直扩展为主 | 水平扩展（分片）容易 |\n| 适用数据量 | 亿级以下 | 十亿级+\n\nMongoDB 的局限：\n• 不支持真正的多表 JOIN，嵌套文档也不能无限深\n• 事务支持不如 MySQL 成熟\n• 运维复杂，需要规划分片键",
+        "followUp": [
+          {
+            "question": "MongoDB 的分片键怎么选？",
+            "answer": "MongoDB分片键选择原则：1）高基数字段，分布均匀避免热点；2）查询时能包含分片键，避免全分片广播查询；3）避免单调递增/递减字段（会导致数据集中到一个分片）。推荐策略：1）计算分片键，如hash(用户ID)保证均匀分布；2）复合分片键，{业务字段+随机字段}；3）反向分片键，对时间戳取反解决时间热点。分片键一旦设置无法修改，需提前规划。错误示例：以ObjectId（单调递增）作为分片键，导致新数据全部写入最后分片。分片键选择影响查询性能和数据分布，是MongoDB架构设计的核心。"
+          },
+          {
+            "question": "你们什么场景用的 MongoDB？",
+            "answer": "MongoDB使用场景：1）内容管理系统，文档型数据天然适合；2）用户行为数据，高写入量、Schema灵活；3）物联网时序数据，按时间序列存储；4）实时分析，按时间或标签分片。实际案例：用户画像数据，字段动态增减，用MongoDB比MySQL更灵活；日志系统，高并发写入，MongoDBwiredTiger引擎压缩率高。选择依据：是否需要复杂JOIN和事务、数据量规模、是否需要水平扩展。MongoDB不适合强事务场景（4.0前），不适合需要大量聚合计算的查询。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch4_q12",
+      "chapterId": "ch4",
+      "number": 12,
+      "title": "ES 的倒排索引原理？全文搜索怎么做的？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "正排索引：文档 → 词项（文档ID到词项列表的映射）\n\n倒排索引：词项 → 文档列表（词项到文档的映射）\n\n示例：\n文档1: \"Java是世界上最好的语言\"\n文档2: \"Python也很棒\"\n\n正排：\n文档1 → [Java, 是, 世界上, 最好, 的, 语言]\n文档2 → [Python, 也, 很, 棒]\n\n倒排：\nJava → [文档1]\n世界上 → [文档1]\nPython → [文档2]\n棒 → [文档2]\n...\n\n全文搜索流程：\n\n1. 文本切词（Analyzer）\n   • Character Filter：过滤 HTML、特殊字符\n   • Tokenizer：按分词器切词（如ik_max_word、standard）\n   • Token Filter：转小写、去除停用词（的、是、也）、同义词扩展\n\n2. 构建倒排索引\n   • 词项 → 文档ID列表 + 词频（TF）+ 文档频率（DF）\n   • 词频越高说明该词对文档越重要\n   • 文档频率越低说明该词越稀有，越有区分度\n\n3. 查询时\n   • Query 也经过 Analyzer 切词\n   • 在倒排索引中找到匹配的词项\n   • 计算相关度得分（TF-IDF / BM25）\n   • 按得分排序返回\n\nBM25 算法（ES 5.0+ 使用）：\n• 对 TF 进行饱和处理：TF 越高得分越高，但有上限\n• 引入文档长度归一化：短文档中出现的词权重更高",
+        "followUp": [
+          {
+            "question": "ES 的分片和副本机制？",
+            "answer": "ES分片（Shard）机制：主分片（Primary Shard）处理写操作，副本分片（Replica Shard）提供数据冗余和读能力。分片数量在创建索引时确定，不可修改（除非reindex）。副本数量可动态调整。默认配置：5个主分片，1个副本分片。分片分配策略：ES通过shard allocation机制在节点间均衡分配分片，避免单节点分片过多。副本作用：1）故障转移，副本提升为主分片；2）提升读性能，搜索请求可打到副本。副本数量设置：考虑节点数量和数据重要性，生产环境至少1个副本。"
+          },
+          {
+            "question": "你们用 ES 做什么场景？数据量多大？",
+            "answer": "风控系统Redis数据量约50GB，使用Redis Cluster 12节点（3主3从）。数据量不大时Codis足够，大数据量或对性能要求高时选Redis Cluster。需要提前规划好slot分配和迁移方案。"
+          },
+          {
+            "question": "分词器是怎么选的？ik_max_word 和 ik_smart 的区别？",
+            "answer": "ES分词器选择：ik_max_word（细粒度分词）和ik_smart（粗粒度分词）。ik_max_word：将文本按照最细粒度分词，如中华人民共和国分为中华人民共和国、中华人民、中华、华人、人民共和国等，适合搜索recall优先场景；ik_smart：粗粒度分词，如中华人民共和国分为中华人民共和国，适合搜索precision优先场景。选型依据：搜索场景需要recall还是precision。标准分词器（standard）对中文按字分，不适合中文搜索。生产环境推荐：搜索字段用ik_max_word提高召回率，聚合字段用ik_smart减少分词数量。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch5_q1",
+      "chapterId": "ch5",
+      "number": 1,
+      "title": "Kafka 怎么保证消息不丢失？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "三个环节都必须配置：\n\n生产者端（acks 配置）：\n• acks=0：发出去就认为成功，最快但最不安全，broker 宕机可能丢消息\n• acks=1：leader 副本写入成功就返回，follower 还没同步就挂了会丢\n• acks=all（或 -1）：ISR 列表中所有副本都写入成功才返回，最安全\n\n推荐配置：\n• acks=all\n• retries = Integer.MAX_VALUE（无限重试）\n• enable.idempotence=true（开启幂等性，防止重复发送）\n\nBroker 端：\n• replication.factor >= 3：每个分区至少 3 个副本\n• min.insync.replicas >= 2：ISR 中至少 2 个副本确认\n• unclean.leader.election.enable = false：不允许从非同步副本选举 leader（防止数据丢失）\n\n消费者端：\n• 手动提交 offset（enable.auto.commit=false，调用 commitSync()）\n• 先处理消息，再提交 offset\n• 处理失败不提交，重启后会重新消费\n\n消息丢失的排查：\n1. 检查 producer 的 acks 配置\n2. 检查 broker 的副本数量和 ISR 配置\n3. 检查消费者是否先处理再提交\n4. 查看消费者 offsets.topic.replication.factor 参数",
+        "followUp": [
+          {
+            "question": "acks=all 性能影响很大吗？怎么权衡？",
+            "answer": "acks=all确实会影响性能，因为要等所有ISR副本确认。优化方案：1）合理设置ISR大小（replication.factor=3, min.insync.replicas=2）；2）批量发送和异步确认；3）选择合适的acks级别。"
+          },
+          {
+            "question": "你们用的 acks 配置是什么？",
+            "answer": "这个问题考察的是Kafka 怎么保证消息不丢失？相关的深度理解。需要根据具体场景选择。如果并发量不大、延迟要求不高，可以用简单方案；如果是大流量、低延迟场景，需要更精细的优化。核心是理解原理后根据实际需求做权衡。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "ISR 是什么意思？",
+            "answer": "ISR（In-Sync Replicas）是Kafka中和leader保持同步的副本集合。定义：follower副本的leo（log end offset）追上leader的leo（在一个时间窗口内），则该follower在ISR中。ISR是Kafka保证数据一致性的核心机制：只有ISR中的副本才被认为是及时的、可依赖的。配置：replica.lag.max.messages和replica.lag.time.max.ms控制follower多久不同步则被踢出ISR。ISR动态变化：follower追不上leader会被踢出，赶上后重新加入。问题场景：网络抖动导致follower短暂脱离ISR，可能导致分区不可用（如果所有follower都脱离）。min.insync.replicas参数保证ISR中至少有多少个副本。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch5_q2",
+      "chapterId": "ch5",
+      "number": 2,
+      "title": "Kafka 消费者 Rebalance 是什么？有什么问题？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "Rebalance（再均衡）：\n• 当消费者组中消费者数量变化（加入、离开、宕机）\n• 或订阅主题的分区数变化\n• 消费者组需要重新分配分区归属\n\n触发条件：\n• 消费者组成员变化（主动加入/离开、崩溃）\n• 分区数变化（订阅的主题新增分区）\n• 订阅主题变化\n\nRebalance 过程：\n1. 所有消费者停止消费（Stop The World）\n2. 协调者（Broker 端）选举新的 consumer leader\n3. consumer leader 制定新的分区分配方案\n4. 协调者将方案发给所有消费者\n5. 消费者开始按照新方案消费\n\nRebalance 的问题：\n\n1. 服务暂停（STW）\n   • 所有消费者在 Rebalance 期间停止消费\n   • 如果频繁 Rebalance，吞吐量严重下降\n\n2. 脑裂问题\n   • 消费者同时离组，导致分区分配不连续\n   • 某些分区没有消费者，消息堆积\n\n3. 重复消费\n   • Rebalance 发生时，部分消息已处理但 offset 未提交\n   • 新消费者接管后会重新消费这些消息\n\n优化方案：\n• Static Membership：使用 static membership，成员不变化就不 Rebalance（session.timeout 设置较长）\n• 提高 session.timeout：减少因网络抖动导致的 Rebalance\n• 减少消费者变动频率：不要频繁启停服务",
+        "followUp": [
+          {
+            "question": "你们遇到过 Rebalance 吗？怎么优化的？",
+            "answer": "这个问题考察的是Kafka 消费者 Rebalance 是什么？有什么问题？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Consumer Group 的 coordinator 是怎么选举的？",
+            "answer": "这个问题考察的是Kafka 消费者 Rebalance 是什么？有什么问题？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Rebalance 和 Partition Assignment 是一样的吗？",
+            "answer": "Rebalance和Partition Assignment相关但不完全相同。Rebalance是消费者组重新分配分区的过程，触发条件包括消费者加入/离开、分区数变化等。Partition Assignment是Rebalance过程中的一个步骤，制定新的分区分配方案并通知所有消费者。Rebalance包含：停止消费→选举consumer leader→制定分配方案→发送方案→消费者开始按新方案消费。Partition Assignment只是制定分配方案这一步。实际场景：Static Membership（session.timeout设置较长）可以减少Rebalance频率，成员不变就不Rebalance。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch5_q3",
+      "chapterId": "ch5",
+      "number": 3,
+      "title": "Kafka 的消息顺序性怎么保证？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "单分区有序：\n\n同一 Partition 内，消息严格按照先进先出（FIFO）顺序消费\n\n实现方法：\n• 生产者：指定相同 Partition（通过 partitioner.murur2 或自定义分区器）\n  producer.send(new ProducerRecord(topic, key, message))\n• 消费者：单线程消费（一个 Partition 只能被一个消费者实例消费）\n\n多分区有序：\n\n全局有序无法保证（除非单 Partition，但牺牲吞吐量）\n\n替代方案：\n1. 消息体携带序列号\n   • 每条消息带上全局递增序号\n   • 消费者先放到本地有序队列\n   • 队列中的消息按序号排序后依次处理\n  2. 按业务字段哈希到固定 Partition\n   • 同一业务 ID（如 user_id）的所有消息都到同一 Partition\n   • 业务上可以接受「同用户有序，不同用户无序」",
+        "followUp": [
+          {
+            "question": "你们风控系统的消息顺序重要吗？",
+            "answer": "风控系统对消息顺序的要求取决于业务场景：1）事件流顺序（如用户操作顺序）必须保证，乱序可能导致误判；2）异步任务消息（如异步特征计算）顺序要求较低。实现方式：1）Kafka单分区+单消费者可保证分区内有序；2）多分区按业务ID哈希（如user_id），同一用户消息总在同一分区；3）如果需要全局有序，可用单分区但会牺牲吞吐量。风控系统经验：特征计算消息对顺序要求低（基于窗口聚合），决策消息对顺序要求高（需按请求时间顺序处理）。"
+          },
+          {
+            "question": "怎么保证消息不重复消费？",
+            "answer": "消息不重复消费需要消费者端实现幂等性。方案：1）数据库唯一索引，消费前先查库是否存在；2）Redis SET NX EX加锁，处理前加锁处理完释放；3）状态机，消息带业务状态，处理前检查状态是否已更新；4）去重表，记录已处理的message_id，定期清理。实际案例：扣款场景，用数据库唯一索引约束（user_id+order_id）；特征计算场景，用Redis去重（message_id到result）。幂等设计原则：无论消费一次还是多次，结果必须一致。"
+          },
+          {
+            "question": "Kafka 的 partitioner 有哪几种？",
+            "answer": "Kafka分区策略：1）DefaultPartitioner默认策略，key不为空时用 murmur2 Hash，key为空时轮询；2）RoundRobinPartitioner，key为空时在所有分区间轮询；3）自定义分区器，实现Partitioner接口。Kafka分区规则：如果指定了key，则对key的hash值取模（保证相同key的消息到同一分区）；如果没有key，则在可用分区间轮询。分区数影响并行度和吞吐量：分区数=消费者数=最大并行度。生产环境建议：Topic创建时就规划好分区数（可增不减），根据峰值QPS和单消费者吞吐量计算分区数。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch5_q4",
+      "chapterId": "ch5",
+      "number": 4,
+      "title": "RocketMQ 和 Kafka 的区别？什么场景选 RocketMQ？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "| 对比维度 | Kafka | RocketMQ |\n|---------|-------|----------|\n| 吞吐量 | 极高（十万级 QPS） | 高（万级 QPS） |\n| 延迟 | 低（毫秒级） | 毫秒级（稍高） |\n| 事务消息 | 不支持（需自研） | 原生支持 |\n| 顺序消息 | 分区内有序 | 支持严格有序（单队列） |\n| 延迟消息 | 不支持 | 支持（定时/延迟消息） |\n| 死信队列 | 无 | 支持（消息消费失败进入死信队列）|\n| 消费模式 | 拉取（pull） | 拉取（pull）+ 推送给缓冲 |\n| 单机吞吐量 | 高 | 中 |\n\n选型建议：\n• 日志采集、大数据实时计算 → Kafka（高吞吐，日志场景对顺序要求低）\n• 电商交易、金融支付 → RocketMQ（事务消息、死信队列、延迟消息支持更好）\n• 异步解耦、削峰填谷 → 两者皆可\n\nRocketMQ 的优势场景：\n1. 分布式事务：RocketMQ 事务消息、半消息机制\n2. 延迟消息：订单超时取消等场景\n3. 消息重试：消费失败的消息自动重试，死信队列兜底",
+        "followUp": [
+          {
+            "question": "RocketMQ 的事务消息是怎么实现的？",
+            "answer": "RocketMQ事务消息原理：1）发送方向RocketMQ发送半消息（half消息），此时消息对消费者不可见；2）执行本地事务；3）本地事务执行成功，发送commit/rollback确认；4）如果是commit，消息对消费者可见；5）事务回查：Broker超过一定时间未收到确认，会回查发送方确认事务状态。核心接口：TransactionListener，本地事务执行和状态回查的回调。应用场景：分布式事务，如订单服务和库存服务的协调。半消息机制保证：如果本地事务失败，消息不会被消费，避免数据不一致。相比Kafka的自研事务方案，RocketMQ提供原生支持。"
+          },
+          {
+            "question": "延迟消息的原理是什么？",
+            "answer": "RocketMQ延迟消息原理：1）延迟消息不立即投递，先存储在延迟队列；2）Broker根据延迟级别（messageDelayLevel配置，如1s/5s/10s/30s/1m等）计算投递时间；3）定时任务扫描到期的消息，投递到对应队列；4）消费者感知到延迟消息，进行消费。实现方式：延迟队列是特殊的消息队列，消息按延迟时间排序，到期后才被投递。版本差异：RocketMQ 4.x延迟消息延迟级别固定（18个级别），5.x支持任意时间延迟。开源版本延迟消息不支持任意精度。应用场景：订单超时取消、定时任务。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch5_q5",
+      "chapterId": "ch5",
+      "number": 5,
+      "title": "消息队列的常见问题？怎么处理？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "| 问题 | 处理方案 |\n|------|----------|\n| 重复消费（幂等） | 消费者端幂等：Redis 去重、数据库唯一索引、状态机 |\n| 消息积压 | 增加消费者/分区；快速消费积压消息（创建新消费者组并行消费）；降级非核心业务 |\n| 消息丢失 | 开启持久化（生产者 acks=all + 消费者手动提交） |\n| 顺序消费 | 单分区单消费者；或消息体带序列号，消费端排序 |\n\n重复消费的处理（幂等性）：\n1. 分布式锁：Redis SET NX EX 加锁，处理前加锁，处理完释放\n2. 数据库唯一索引：消费前先查库是否存在，存在则跳过\n3. 状态机：消息带业务状态，处理前检查状态是否已更新\n4. 去重表：记录已处理的 message_id，定期清理\n\n消息积压的处理：\n1. 临时扩容消费者（消费者组加机器）\n2. 如果是 Kafka，临时创建新消费者组，并行消费积压消息\n3. 处理完积压后，恢复原有消费者数量\n4. 监控告警：积压量超过阈值（如 10 万条）立即告警",
+        "followUp": [
+          {
+            "question": "怎么设计一个消息幂等消费的系统？",
+            "answer": "幂等消费系统设计：1）唯一消息ID：每条消息带全局唯一ID（message_id）；2）去重表：消费前查去重表，存在则跳过；3）状态机：消息带业务状态字段，消费前检查状态；4）数据库唯一约束：利用数据库唯一索引防止重复写入；5）Redis SET NX：消费前尝试SET key NX EX，超时则认为已消费。架构示例：消费入口层（消息解析+去重检查）→业务处理层→结果存储层（状态更新+去重表记录）。关键点：去重表需定期清理（TTL），避免无限膨胀。幂等是消息队列的基础能力，必须在设计阶段考虑。"
+          },
+          {
+            "question": "消息积压你们是怎么发现的？",
+            "answer": "消息积压发现方法：1）Kafka Manager/Confluent Control Center监控消费者lag（滞后消费数量）；2）JMX监控KafkaConsumer的records-lag-max；3）消费者端记录处理速率（processed per second）；4）监控告警：lag超过阈值（如1万条）立即告警。Kafka lag正常范围：正常情况下lag接近0，积压时lag快速上涨。积压原因：消费者处理速度慢（代码bug、线程池耗尽）或消费者下线。解决：1）扩容消费者；2）优化消费者处理逻辑；3）临时创建消费者组并行消费积压消息；4）如果是Kafka，可使用binlog备份消费。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch6_q1",
+      "chapterId": "ch6",
+      "number": 1,
+      "title": "Flink 的状态管理和 Checkpoint 机制？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "状态管理：\n\nKeyed State（按键分区状态）：\n• ValueState<T>：单个值\n• ListState<T>：列表\n• MapState<K, V>：键值对\n• ReducingState<T>、AggregatingState<T, R>：聚合状态\n\nOperator State（算子状态）：\n• ListState<T>：列表形式\n• UnionListState<T>：故障恢复时分发给所有算子实例\n• BroadcastState<K, V>：广播状态，所有实例都能访问\n\n状态后端：\n• HashMapStateBackend：状态存储在 JVM 堆内存，存取快，状态大时 GC 压力大\n• EmbeddedRocksDBStateBackend：状态存储在 RocksDB（LMDB），支持增量 Checkpoint，适合超大规模状态\n\nCheckpoint 机制（Chandy-Lamport 分布式快照）：\n\n1. JobManager 定期发起 Checkpoint（默认 1 分钟）\n2. JobManager 向所有算子发送 Barrier（栅栏）\n3. Barrier 随数据流往下游算子流动\n4. 算子收到 Barrier 时做快照（状态快照）\n5. 快照完成后，通知 JobManager\n6. 所有算子都完成快照，Checkpoint 完成\n\nBarrier 对齐：\n• 多输入算子（如 CoProcessFunction）需要对齐\n• 等待所有输入的 Barrier 都到达，才开始快照\n• 对齐期间，如果某个输入 Barrier 先到，算子会缓存后续数据\n• 如果某个输入延迟大，会阻塞其他输入，导致反压",
+        "followUp": [
+          {
+            "question": "Barrier 对齐的时候会阻塞怎么办？",
+            "answer": "这个问题考察的是Flink 的状态管理和 Checkpoint 机制？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Flink 的时间语义（Event Time vs Processing Time）？",
+            "answer": "Flink时间语义分两种：Event Time（事件时间）是数据本身携带的时间戳，如日志的生成时间；Processing Time是算子处理数据的本地时间。选型：Event Time适合对数据顺序有要求、需要历史数据重放的场景；Processing Time适合延迟敏感、不关心数据实际产生时间的场景。使用Event Time必须设置Watermark（水位线），处理乱序数据。Watermark机制：Watermark(t)表示时间t之前的数据都已到达，后续时间t的数据是迟到的。生成方式：周期性生成（Periodic）或标点式生成（Punctuated）。"
+          },
+          {
+            "question": "Watermark 怎么生成和传递？",
+            "answer": "Flink Watermark生成和传递：生成方式：1）周期性生成器（PeriodicGenerator），按时间间隔生成，如BoundedOutOfOrdernessWatermarks；2）标点式生成器（PunctuatedGenerator），在特定事件触发时生成。传递：Watermark沿算子流向下游传播，每个输入算子维护自己的Watermark，取所有输入Watermark的最小值作为当前Watermark。当Watermark到达算子时，触发窗口计算并清空窗口内已处理数据。多输入算子：取所有输入的Watermark最小值（确保所有输入都到达才触发计算）。Watermark传播机制保证了基于Event Time的窗口计算能够正确处理乱序事件。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch6_q2",
+      "chapterId": "ch6",
+      "number": 2,
+      "title": "Flink 的实时特征是怎么处理的？和离线特征怎么打通？",
+      "difficulty": "advanced",
+      "labels": [],
+      "answer": {
+        "content": "实时特征处理流程：\n\n数据源(Kafka) → Flink Job → 实时特征计算 → 特征服务 → 模型推理\n\n实时特征存储选型：\n• Redis：读取延迟最低（亚毫秒），适合简单特征\n• HBase：支持范围查询，适合历史聚合特征\n• Feature Store（Feast/FeatureScope）：统一管理离线和实时特征\n\n实时特征和离线特征打通：\n\n方案1：Lambda 架构\n• 离线层：Hive/Spark 批处理计算历史特征，T+1 更新\n• 实时层：Flink 计算实时特征，秒级更新\n• 查询时合并：实时特征优先，实时没有查离线\n\n方案2：Kappa 架构\n• 全部用流处理，统一用 Kafka\n• 历史数据当成一个延迟很久的实时流\n• 简化架构，但实时计算压力大\n\n特征一致性保证：\n• 离线特征用 Hive UDF 计算，实时特征用 Flink 同样的 UDF\n• 特征注册中心：统一管理特征定义，计算逻辑只维护一份\n• 特征版本管理：特征计算逻辑变更时，新版本和老版本同时存在，灰度切换",
+        "followUp": [
+          {
+            "question": "实时特征和离线特征的一致性怎么保证？",
+            "answer": "特征一致性保证方法：1）计算逻辑统一：离线特征用Hive UDF计算，实时特征用Flink同样的UDF，保证代码逻辑一致；2）特征注册中心：统一管理特征定义，计算逻辑只维护一份；3）特征版本管理：新版本特征计算逻辑变更时，新旧版本同时存在，灰度切换；4）一致性校验：每日抽样对比离线特征和实时特征的差异，差异超过阈值告警。Lambda架构的权衡：实时特征（秒级）和离线特征（T+1）存在时间口径不一致，解决方案是按时间窗口对齐（如都从凌晨0点开始计算）。"
+          },
+          {
+            "question": "特征上线流程是什么？",
+            "answer": "特征上线流程：1）特征设计：确定特征口径、计算逻辑、数据源；2）离线验证：在Hive上用历史数据计算特征，验证覆盖率和分布；3）上线申请：评审特征口径和实现方案；4）实时特征开发：Flink任务开发，单元测试；5）特征服务上线：配置特征路由，灰度生效；6）效果验证：对比新旧特征分布，差异过大需回退；7）全量上线：监控无误后全量。关键点：特征回填（历史数据补录）要提前规划，避免上线后数据空洞。监控：特征值分布、特征命中率、特征延迟。"
+          },
+          {
+            "question": "你们用的什么特征存储？",
+            "answer": "特征存储选型：1）Redis：延迟最低（亚毫秒），适合简单特征（单值、列表）；2）HBase：支持范围查询，适合历史聚合特征（最近7天、30天）；3）Tair：阿里开源，支持多种数据结构，性能与Redis相近；4）Feature Store（Feast/FeatureScope）：统一管理离线和实时特征。实际选型：Redis存实时特征（String/Hash），HBase存历史聚合特征（按时间范围查询）。Redis的key设计：feature:entity_id:feature_name，如feature:user123:trade_amount_7d。缓存失效策略根据特征更新频率设置。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch6_q3",
+      "chapterId": "ch6",
+      "number": 3,
+      "title": "Spark 的任务调度流程？Shuffle 的原理？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "任务调度流程：\n\nApplication（用户提交的程序）\n  ↓\nJob（一个 Action 算子触发一个 Job）\n  ↓\nStage（根据 Shuffle 划分，一个 Job 分为多个 Stage）\n  ↓\nTask（每个 Stage 内并行执行的任务单位）\n  ↓\nExecutor（实际执行 Task 的容器）\n\nStage 划分规则：\n• 从后往前，遇到 Shuffle 算子（groupByKey、reduceByKey等）就划分新的 Stage\n• Stage0：结果算子之前的所有窄依赖算子\n• Stage1：Shuffle 后的窄依赖算子\n\nShuffle 过程：\n\nMap 端（Shuffle Write）：\n1. MapTask 计算完成后，按照下游 Partition 数量写入不同的文件\n2. 先写入本地磁盘（spill 到磁盘防止内存溢出）\n3. 全部完成后，MapOutputTracker 记录 Map 结果的位置\n\nReduce 端（Shuffle Read）：\n1. ReduceTask 去 MapOutputTracker 获取 Map 结果的位置\n2. 通过 HTTP 从 Map 节点拉取数据\n3. 拉取的数据先放入内存，内存不够就 Spill 到磁盘\n4. 按 key 进行聚合（aggregation）\n\nAQE（Adaptive Query Execution）优化：\n• 动态分区合并：Shuffle 后分区数过多时自动合并\n• 动态调整 Join 策略：广播 JOIN 自动提升（ BroadcastHashJoin）\n• 动态处理数据倾斜：自动检测倾斜分区，拆分处理",
+        "followUp": [
+          {
+            "question": "数据倾斜的原因？怎么解决？",
+            "answer": "数据倾斜原因：1）热点key，如某些大V用户的数据量远超普通用户；2）Hash Key分布不均，部分ReduceTask处理数据量远超其他；3）业务数据分布不均，如某个地区数据特别多；4）SQL分区字段选择不当，导致数据集中在某些分区。排查方法：1）Spark UI看各Task处理数据量分布；2）观察日志中的Task时长，是否有Task明显超时；3）分析数据分布，识别热点key。解决思路：1）加盐打散热点key；2）两阶段聚合（局部聚合+全局聚合）；3）广播JOIN优化小表JOIN；4）自定义分区器按业务字段分散热点。"
+          },
+          {
+            "question": "Spark Streaming 和 Structured Streaming 的区别？",
+            "answer": "Spark Streaming（DS）是基于微批处理的流处理引擎，将数据切分成小批次处理，延迟秒级；Structured Streaming是新一代流处理API，基于Spark SQL引擎，延迟更低（毫秒级），支持end-to-end exactly-once。区别：1）API：Streaming是独立的DStream API，Structured Streaming使用DataFrame/DataSet API；2）事件时间支持：Structured Streaming更完善；3）水位线和晚到数据处理：Structured Streaming内置支持；4）未来发展：Structured Streaming是未来方向，Streaming已进入维护模式。选型建议：新项目选Structured Streaming，老项目迁移逐步进行。"
+          },
+          {
+            "question": "Shuffle 为什么容易导致性能问题？",
+            "answer": "这涉及到系统设计的核心权衡。以线程池为例，核心参数（corePoolSize、maxPoolSize、queueCapacity）需要根据业务负载特点（CPU密集/IO密集）、峰值QPS、平均耗时来综合计算，确保性能最优且资源可控。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch6_q4",
+      "chapterId": "ch6",
+      "number": 4,
+      "title": "Spark 怎么解决数据倾斜？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "| 方法 | 适用场景 |\n|------|----------|\n| 加盐 | key 被打散，但需要修改业务逻辑 |\n| 两阶段聚合（局部 shuffle + 全局聚合）| hotspot key，但聚合逻辑可以分开 |\n| 广播 JOIN | 小表 JOIN 大表，将小表广播到每个节点 |\n| 手动打散大表 | 大表 JOIN 大表，对大表按 key 加随机前缀 |\n| 自定义分区器 | 针对业务特点自定义分区逻辑 |\n\n加盐法：\n```scala\n// 第一阶段：按 key + 随机数聚合\nrdd.map(x => (x.key + \"_\" + Random.nextInt(10), x))\n    .reduceByKey((a,b) => (a._1, a._2 + b._2))\n// 第二阶段：去掉盐，再全局聚合\n.map(x => (x.key.split(\"_\")(0), x._2))\n    .reduceByKey(_ + _)\n```\n\n广播 JOIN 原理：\n• 小表（< 10MB）广播到每个 Executor 内存\n• 大表不动，遍历大表，从广播的小表查找\n• 避免了 Shuffle，没有数据倾斜\n\n数据倾斜排查：\n1. Spark UI 看 Stage 各个 Task 时长分布\n2. 倾斜的 Task 处理的数据量是否远大于其他 Task\n3. 看日志，确定是哪个 Stage 倾斜",
+        "followUp": [
+          {
+            "question": "两阶段聚合的原理是什么？",
+            "answer": "两阶段聚合（局部聚合+全局聚合）解决数据倾斜：原理：1）第一阶段（局部聚合）：给热点key加随机前缀（如key_randomId），将数据打散到不同的ReduceTask，在每个ReduceTask内部做局部聚合（每个reduceTask输出key, value对）；2）第二阶段（全局聚合）：去掉随机前缀，按原始key做全局聚合。第一阶段将原本集中的热点key分散到了多个Task，摊薄了计算压力。关键：局部聚合要保留原始key的信息用于后续全局聚合。适用场景：适用于key的聚合类操作（sum、count、avg等），不适合需要原始key信息的场景（如collect_set）。"
+          },
+          {
+            "question": "你们遇到过数据倾斜吗？怎么解决的？",
+            "answer": "这个问题考察的是Spark 怎么解决数据倾斜？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "广播 JOIN 有什么限制？",
+            "answer": "广播JOIN的限制：1）小表大小限制：默认10MB可通过spark.sql.autoBroadcastJoinThreshold调整，太大会导致内存溢出；2）广播变量所有节点都复制一份，网络开销和数据一致性问题；3）广播的表在每个Task都有一份副本，内存占用按副本数放大；4）不支持右外连接和全外连接。适用条件：小表可以完全加载到内存，且大小不超过广播阈值。判断方法：用broadcast join hint或配置autoBroadcastJoinThreshold。替代方案：大表JOIN大表时使用Shuffle Hash Join或Sort Merge Join。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch6_q5",
+      "chapterId": "ch6",
+      "number": 5,
+      "title": "Hive 的底层执行引擎？MapReduce vs Tez vs Spark？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "Hive 执行引擎对比：\n\n| 引擎 | 特点 | 适用场景 |\n|------|------|----------|\n| MapReduce | 磁盘IO多，慢，，每个 Job 单独计算 | 历史兼容 |\n| Tez | DAG 优化，减少磁盘IO，一个 SQL 可能就是一个 DAG | 交互式查询 |\n| Spark | 内存计算，最快，DataFrame/DataSet API | 大规模数据分析 |\n\nMapReduce 的问题：\n• 每个 Job 单独启动 HDFS 读写，IO 开销大\n• 多个 MR Job 之间数据落盘，网络传输\n\nTez 的改进：\n• 一个复杂 SQL 对应一个 DAG\n• 减少不必要的数据读写\n• 内存中流式处理，减少 HDFS IO\n\nSpark 的优势：\n• 基于内存计算（除非显式 Spill 到磁盘）\n• DAG 优化：一个 SQL 整体优化\n• 支持 DataFrame/DataSet API，比 MR 代码简洁",
+        "followUp": [
+          {
+            "question": "Hive 的优化技巧？",
+            "answer": "Hive优化技巧：1）表设计：分区（partition）减少扫描量，分桶（bucket）优化JOIN；2）SQL优化：避免SELECT *，少用DISTINCT，用GROUP BY替代DISTINCT去重；3）JOIN优化：小表放左边（先加载到内存），大表放右边，使用MAP JOIN（广播小表）；4）数据压缩：开启ORC/CarbonData列式存储和压缩；5）小文件治理：合并小文件（Distribute by rand()、repartition）；6）并行执行：开启并行（set hive.exec.parallel=true）；7）向量化执行：set hive.vectorized.execution.enabled=true。监控：Explain查看执行计划，检查是否走索引、分区裁剪是否生效。"
+          },
+          {
+            "question": "数据倾斜怎么处理？",
+            "answer": "数据倾斜处理方法：1）加盐打散：对热点key加随机前缀；2）两阶段聚合：局部聚合+全局聚合；3）广播JOIN：小表广播到大表各节点，避免Shuffle；4）打散大表：对大表按key加随机前缀，然后与同样处理的小表JOIN；5）自定义分区器：按业务特点自定义分区逻辑。排查步骤：用Spark UI观察Task数据量分布，确认倾斜后分析热点key，针对性优化。实战案例：某次发现某个用户的历史数据量是其他用户的1000倍，导致ReduceTask超时，优化后将用户数据按时间分桶分别处理。"
+          },
+          {
+            "question": "你们 Hive 用的什么引擎？",
+            "answer": "Hive引擎选型：1）MapReduce：历史兼容，IO开销大，每个Job单独计算；2）Tez：DAG优化减少IO，适合交互式查询；3）Spark：内存计算，速度最快，支持DataFrame/DataSet API。团队实践：批处理ETL任务用Spark引擎（性能最优），Ad-hoc查询用Tez引擎（比MR快5-10倍），历史任务保持MR引擎（改动成本高）。配置：set hive.execution.engine=spark。Spark引擎配置：executor-memory、executor-cores根据数据量调整。监控：观察任务执行时间，逐步优化慢任务。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch6_q6",
+      "chapterId": "ch6",
+      "number": 6,
+      "title": "Hadoop 的 HDFS 读写流程？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "写流程：\n\n1. 客户端向 NameNode 请求上传文件\n2. NameNode 检查权限、目标路径是否存在\n3. NameNode 返回 DataNode 列表（如 3 个副本）\n4. 客户端按流水线（Pipeline）写入：\n   • 写入 DataNode 1\n   • DataNode 1 写入本地并转发给 DataNode 2\n   • DataNode 2 写入本地并转发给 DataNode 3\n   • DataNode 3 写入本地\n5. 反向发送 ACK 确认（Pipeline 反方向）\n6. 所有节点确认成功，客户端关闭连接\n7. NameNode 更新元数据（Blocks 位置）\n\n读流程：\n\n1. 客户端向 NameNode 请求下载文件\n2. NameNode 检查权限，返回文件对应的 Block 位置\n3. 客户端就近选择 DataNode（同一个机架优先）读取\n4. 读取完成后，客户端与 DataNode 建立流读取连接\n5. 数据从 DataNode 流式返回给客户端\n6. 读取完一个 Block 后，客户端继续读取下一个 Block\n7. NameNode 汇报 Block 位置，客户端选择最近的 DataNode 继续",
+        "followUp": [
+          {
+            "question": "NameNode 的 HA 怎么实现？",
+            "answer": "HDFS NameNode HA实现：1）双NameNode（Active/Standby）共享editlog（通过NFS或QJM）；2）Active NameNode负责读写，Standby同步日志并准备接管；3）Zookeeper监控NameNode健康，故障时自动切换。QJM（Quorum Journal Manager）方案：使用奇数个JournalNode（通常3个），editlog写入多数节点即成功。自动切换流程：Zookeeper检测到Active不可达→通知Standby→Standby加载共享editlog→转变为Active。配置：dfs.nameservices、dfs.ha.namenodes.nameservice、dfs.client.failover.proxy.provider。好处：消除NameNode单点故障，保证HDFS高可用。"
+          },
+          {
+            "question": "DataNode 挂了怎么办？",
+            "answer": "DataNode挂了处理机制：1）NameNode通过心跳检测（默认10秒一次，超过10分钟无心跳认为宕机）；2）宕机后，NameNode将该DataNode上的副本标记为欠缺的，触发副本补充（该副本在其他DataNode重新复制）；3）如果副本数小于配置（默认3），会重新均衡数据。处理流程：心跳超时→标记为decommissioned→自动补充副本→数据重平衡。运维注意：下线DataNode前先执行 decommission，避免数据丢失；副本数设置要大于等于2，否则单机架环境下节点挂了会丢数据。监控：DataNode心跳失败告警，decommission状态告警。"
+          },
+          {
+            "question": "机架感知是怎么配置的？",
+            "answer": "HDFS机架感知配置：1）实现 RackResolver接口或编写Python脚本通过topology.script.file.name指定；2）脚本接收IP地址输出机架路径（如/rack1/10.0.0.1）；3）NameNode通过脚本获取节点机架位置。作用：写入数据时，HDFS按机架策略放置副本，通常第一个副本在写入客户端同机架，第二个副本在不同机架，第三个副本在第二个机架的不同节点。好处：单rack故障不会丢失数据，跨rack读取走机架间带宽。配置示例：topology.script.file.name=/opt/hadoop/rack.sh。不配置机架感知会导致副本都在同一机架，机架故障时数据丢失。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q1",
+      "chapterId": "ch7",
+      "number": 1,
+      "title": "风控系统的整体架构？有哪些核心子系统？",
+      "difficulty": "intermediate",
+      "labels": [
+        "高频追问"
+      ],
+      "answer": {
+        "content": "子系统划分：\n\n1. 决策引擎\n   • 规则执行：规则配置化，实时决策\n   • 规则热加载：规则变更无需重启\n   • P99 延迟 < 50ms\n\n2. 特征平台\n   • 特征计算：实时特征（Flink）、离线特征（Spark）\n   • 特征服务：对外提供特征查询 API\n   • 特征注册中心：统一管理特征定义\n\n3. 关系图谱\n   • 图数据库：Neo4j/JanusGraph\n   • 团伙识别：社区发现、标签传播算法\n   • 关联分析：二度、三度关联查询\n\n4. 实时计算\n   • Flink 实时特征计算\n   • Kafka 消息队列\n   • Redis 实时特征存储\n\n5. 离线分析\n   • Hive/Spark 离线特征\n   • 历史数据回溯\n   • 特征上线前的验证\n\n6. 监控大盘\n   • 实时指标监控（Grafana）\n   • 拦截率、误伤率、响应时间\n\n数据流：\n实时请求 → API Gateway → 决策引擎 ← 特征服务 ← Redis/Flink\n                                         ↓\n                                      图数据库\n                                         ↓\n                               离线分析（Hive/Spark）",
+        "followUp": [
+          {
+            "question": "这些子系统之间的数据流是什么样的？",
+            "answer": "子系统数据流设计：实时请求→API Gateway→风控决策引擎→特征服务（Redis+Flink实时特征）→图数据库（Neo4j/JanusGraph）→离线分析层（Hive/Spark）。数据同步方式：Kafka做消息总线解耦各系统；特征数据通过Redis共享（实时）和HBase（历史）；图数据库单独存储关系数据。关键设计点：1）各子系统通过消息队列异步通信，避免紧耦合；2）Redis缓存热点特征，减少Flink计算压力；3）ES存储可搜索的中间结果。监控：各环节延迟和吞吐量，端到端链路追踪（TraceId）。"
+          },
+          {
+            "question": "各子系统的边界怎么划分？",
+            "answer": "子系统边界划分原则：1）单一职责，每个子系统只负责一块能力；2）接口隔离，子系统间通过明确定义的API交互；3）数据自包含，每个子系统有自己的数据存储，不直接依赖其他系统的库表；4）独立部署，每个子系统可独立发布和扩缩容。实际划分：决策引擎（规则执行）、特征平台（特征计算存储）、关系图谱（图数据库）、实时计算（Flink+Kafka）、离线分析（Hive/Spark）。跨子系统调用通过RPC或消息队列。关键：接口变更需要兼容性考虑，数据库表不能直接跨库JOIN。"
+          },
+          {
+            "question": "决策引擎和特征服务是怎么交互的？",
+            "answer": "决策引擎与特征服务交互方式：1）特征服务暴露REST/gRPC接口，决策引擎在规则执行前并行调用；2）特征数据通过Redis共享，决策引擎直接读取（减少网络开销）；3）特征服务提供表达式服务，规则中引用特征名自动获取并计算。流程：请求进入→规则引擎解析需要的特征列表→并行调用特征服务获取特征值→特征注入规则上下文→规则执行→返回决策结果。性能优化：1）热点特征本地缓存（Caffeine）；2）异步预取下一批特征；3）特征服务超时降级策略（返回默认值或跳过依赖该特征规则）。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q2",
+      "chapterId": "ch7",
+      "number": 2,
+      "title": "决策引擎是怎么设计的？Chopper 脚本引擎是怎么实现的？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解",
+        "设计能力"
+      ],
+      "answer": {
+        "content": "规则组织方式：\n\n1. 规则配置化（JSON/YAML）\n   • 规则条件：表达式语法（兼容历史 Jexl）\n   • 规则动作：PASS/REJECT/REVIEW/LOG\n   • 规则优先级：数字越小优先级越高\n\n2. 规则版本管理\n   • 每条规则有版本号\n   • 支持灰度发布：规则 A 新版本只对 10% 流量生效\n   • 版本回滚：旧版本保留，可快速切换\n\n3. 规则热加载\n   • 规则变更后，无需重启服务\n   • 通过 Watch 文件系统或消息队列通知\n   • 加载时做规则编译验证\n\n4. 规则执行流程\n   • 输入变量：用户特征、上下文\n   → 规则匹配：按优先级遍历所有规则\n   → 命中条件 → 执行动作\n   → 规则冲突：按优先级决策\n\nChopper 脚本引擎实现：\n\n1. 语法兼容 Jexl\n   • 支持变量访问：user.age\n   • 支持方法调用：list.contains(item)\n   • 支持三元运算符\n\n2. 沙箱隔离\n   • 自定义 ClassLoader，限制可加载的类\n   • 不允许反射、System.exit()、文件IO等危险操作\n   • 规则执行超时控制\n\n3. 热加载支持\n   • 规则存储在配置中心（Apollo/Zookeeper）\n   • 规则变更推送 → 重新编译 → 替换旧规则\n\n4. 预编译 + 缓存优化\n   • 规则编译成 AST，缓存 AST\n   • 相同规则的重复执行直接走缓存结果\n\n性能优化（P99 降低 50%）：\n• 规则预编译 + AST 缓存\n• 特征并行获取（CompletableFuture）\n• 规则短路：高层级规则命中后跳过后续规则\n• 本地缓存热点特征",
+        "followUp": [
+          {
+            "question": "沙箱隔离怎么实现的？",
+            "answer": "规则引擎沙箱隔离实现：1）自定义ClassLoader，限制可加载的类（只允许规则相关的类）；2）禁止危险API：反射（getClass/getDeclaredMethod）、System.exit()、文件IO、网络IO；3）脚本执行超时控制（默认100ms，超时终止）；4）内存限制（通过ThreadLocal统计对象分配，超过阈值抛出异常）。实现示例：Chopper引擎使用Jexl脚本语言，自定义ClassLoader加载规则类，SecurityManager监控危险操作。阿里开源的Druid SQL解析器也有类似的安全防护思路。"
+          },
+          {
+            "question": "规则执行的性能瓶颈在哪？怎么优化？",
+            "answer": "规则引擎性能瓶颈：1）特征获取延迟（占比60%），包括网络开销、Redis查询；2）规则匹配遍历（占比20%），规则数量多时遍历开销大；3）表达式计算（占比15%），复杂表达式解析和计算耗时；4）序列化和反序列化（占比5%）。优化方向：1）特征并行获取（CompletableFuture）；2）规则预编译+AST缓存；3）规则短路（高层级规则命中后跳过后续规则）；4）热点特征本地缓存；5）使用高性能表达式引擎（如Aviator）。实测：优化后P99从80ms降到30ms。"
+          },
+          {
+            "question": "P99 延迟降低 50% 具体是怎么做的？",
+            "answer": "P99延迟优化实践：1）特征并行获取，用CompletableFuture.allOf合并多个特征查询；2）规则预编译，规则表达式编译成字节码缓存，避免重复解析；3）本地缓存热点特征，Caffeine缓存TTL设为1分钟；4）规则短路，优先级高的规则命中后跳过后续遍历；5）减少中间对象创建，复用规则执行上下文。实测数据：特征并行获取减少延迟15ms，规则预编译减少10ms，本地缓存减少20ms，P99从80ms降到35ms。关键：持续监控各环节耗时，针对性优化。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q3",
+      "chapterId": "ch7",
+      "number": 3,
+      "title": "特征平台怎么统一接入多种特征源的？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "特征来源分类：\n\n1. 实时特征\n   • Flink 计算：Kafka 数据源，滑动窗口聚合\n   • Redis 存储：最终结果\n\n2. 离线特征\n   • Hive/Spark 批处理计算\n   • T+1 更新到 HBase\n\n3. 第三方服务\n   • HTTP/RPC 调用外部特征\n   • 如：黑名单库、名单服务\n\n4. 静态配置\n   • 人工配置的常量特征\n   • 如：风控等级、风险阈值\n\n统一路由架构：\n\n1. 特征注册中心\n   • 定义每个特征的元信息：名称、类型、来源、TTL\n   • 特征描述文件（FeatureSchema）\n\n2. 统一 SDK（FeatureClient）\n   • 封装所有特征获取逻辑\n   • 提供统一的 API：getFeature(featureName)\n\n3. 表达式引擎（在线加工）\n   • 原始特征 → 表达式计算 → 新特征\n   • 如：近7天交易金额 / 近30天交易金额 = 交易环比\n   • 表达式引擎：Aviator/Groovy/Janino\n\n4. 特征获取流程\n   • 请求进来，解析需要哪些特征\n   • 查本地缓存 → 查 Redis → 并行调用各特征源\n   • 汇总结果，表达式计算，返回",
+        "followUp": [
+          {
+            "question": "实时特征和离线特征怎么保证一致性？",
+            "answer": "这个问题考察的是特征平台怎么统一接入多种特征源的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "表达式引擎是怎么实现的？用的什么技术？",
+            "answer": "这个问题考察的是特征平台怎么统一接入多种特征源的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "特征上线流程是什么？",
+            "answer": "特征上线流程：1）特征设计：确定特征口径、计算逻辑、数据源；2）离线验证：在Hive上用历史数据计算特征，验证覆盖率和分布；3）上线申请：评审特征口径和实现方案；4）实时特征开发：Flink任务开发，单元测试；5）特征服务上线：配置特征路由，灰度生效；6）效果验证：对比新旧特征分布，差异过大需回退；7）全量上线：监控无误后全量。关键点：特征回填（历史数据补录）要提前规划，避免上线后数据空洞。监控：特征值分布、特征命中率、特征延迟。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q4",
+      "chapterId": "ch7",
+      "number": 4,
+      "title": "关系图谱用的 Neo4j？具体做什么分析？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "典型应用场景：\n\n1. 团伙识别\n   • 识别注册关联（如同一设备注册多个账号）\n   • 交易链路关联（同一 IP 发起多笔交易）\n   • 资金流向分析（资金链追踪）\n\n2. 关联分析\n   • 一度关联：直接联系人\n   • 二度关联：联系人的联系人\n   • 三度关联：深度关联查询\n\n3. 虚假注册\n   • 同一手机号/设备注册多个账号\n   • 批量注册识别\n\n4. 套现欺诈\n   • 套现用户关联分析\n   • 套现团伙识别\n\n技术选型：\n• Neo4j：单机版，适合中小规模（图规模 < 10 亿节点）\n• JanusGraph：分布式图数据库，支持更大规模，但运维复杂\n\n图计算算法：\n• PageRank：节点重要性排序\n• 社区发现（Community Detection）：Louvain/Label Propagation\n• 标签传播（Label Propagation）：半监督分类\n• 连通分量（Connected Components）：识别团伙\n\n性能优化：\n• 索引优化：创建复合索引（如基于起始节点+关系类型的索引）\n• 缓存：热点节点缓存到 Redis\n• 分层查询：先过滤再查询，减少搜索空间",
+        "followUp": [
+          {
+            "question": "图计算算法用什么？PageRank？社区发现？",
+            "answer": "这个问题考察的是关系图谱用的 Neo4j？具体做什么分析？相关的深度理解。需要根据具体场景选择。如果并发量不大、延迟要求不高，可以用简单方案；如果是大流量、低延迟场景，需要更精细的优化。核心是理解原理后根据实际需求做权衡。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "图数据量有多大？查询性能怎么样？",
+            "answer": "风控系统Redis数据量约50GB，使用Redis Cluster 12节点（3主3从）。数据量不大时Codis足够，大数据量或对性能要求高时选Redis Cluster。需要提前规划好slot分配和迁移方案。"
+          },
+          {
+            "question": "Neo4j 的查询性能瓶颈在哪？",
+            "answer": "这个问题考察的是关系图谱用的 Neo4j？具体做什么分析？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q5",
+      "chapterId": "ch7",
+      "number": 5,
+      "title": "风控系统的 AB 实验是怎么设计的？",
+      "difficulty": "advanced",
+      "labels": [
+        "设计能力"
+      ],
+      "answer": {
+        "content": "核心设计要点：\n\n1. 流量切分\n   • Hash 分桶：userId % 100，得到 0-99 的桶号\n   • 桶号在实验范围内（如 0-9）→ 实验组，否则对照组\n   • 相同 userId 每次分到的桶号固定（可重现）\n\n2. 实验分层\n   • 层与层之间正交：流量在每层独立分配\n   • 层内互斥：同一用户不会同时命中两个实验\n   • 示例：\n     - Layer1：特征工程实验（流量 20%）\n     - Layer2：模型调参实验（流量 20%）\n     - Layer3：UI 改版实验（流量 10%）\n\n3. 灰度放量\n   • 实验上线后，从小流量开始：5% → 10% → 20% → 50% → 100%\n   • 每阶段观察 1-2 天，确认无异常再放大\n\n4. 效果评估\n   • 核心指标：拦截率、误伤率、响应时间\n   • 统计显著性：样本量足够？置信区间？\n   • AA 测试：对照组本身是否有差异\n\n注意事项：\n• 分层要合理，避免层间干扰（如 UI 改版影响点击率）\n• 流量要足够（统计功效分析）\n• 实验周期要覆盖业务周期（避免周末/工作日差异）",
+        "followUp": [
+          {
+            "question": "实验分组的均匀性怎么保证？",
+            "answer": "实验分组均匀性保证：1）Hash分桶：Hash(userId) % 100，相同userId每次分到相同桶，跨实验分层；2）互斥组：同一用户不会同时命中互斥的实验；3）分层正交：每层实验流量独立分配，用户在不同层概率独立；4）AA测试验证：新实验上线前，先用AA测试验证分组是否均匀（p大于0.05）。均匀性指标：各实验组用户数、核心指标（性别、年龄、城市）分布。分层设计：Layer1=特征实验，Layer2=模型实验，Layer3=UI实验。遇到分组不均匀时的处理：检查Hash算法是否正确、用户属性分布是否天然倾斜（需分层抽样）。"
+          },
+          {
+            "question": "怎么判断实验效果显著？",
+            "answer": "实验效果显著性判断：1）样本量计算：提前计算所需最小样本量（power analysis），通常需要每组1000+样本；2）统计检验：双样本t检验，p小于0.05认为显著；3）置信区间：95%置信区间不包含0认为显著；4）业务显著性：统计显著不等于业务显著，需同时评估业务价值。常见错误：只看相对提升，不看绝对值；只看短期效果，不看长期效果；多重比较问题（同时测多个指标）。建议：核心指标控制在2-3个，避免海战术；观察周期覆盖完整业务周期（至少一周）。"
+          },
+          {
+            "question": "你们实验分流用的什么算法？",
+            "answer": "实验分流算法：1）简单Hash：userId % 100，简单但无法分层；2）MurmurHash3：均匀性更好，支持分层；3）自定义Range-based分流：按桶号范围划分，支持灰度放量。分层分流实现：每层分配独立流量，层内互斥。如：Layer1占20%流量，Layer2占20%，Layer1内实验A占5%、实验B占15%。分流服务推荐：完全随机可用Tornado，自带分层和互斥功能。关键：分流算法要稳定，相同userId在实验期间分桶不变，否则用户会看到不一致的实验结果。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q6",
+      "chapterId": "ch7",
+      "number": 6,
+      "title": "RAG 知识库在风控系统里具体是怎么构建的？",
+      "difficulty": "advanced",
+      "labels": [],
+      "answer": {
+        "content": "构建流程（5 步）：\n\n1. 文档解析\n   • PDF/Word → 文本提取\n   • 表格内容处理（转成 Markdown 格式）\n   • 图片 OCR（如有）\n\n2. 文本分块（Chunking）\n   • 按段落或固定长度分块\n   • Chunk 大小：通常 500-1000 tokens\n   • 重叠分块：相邻 chunk 保留部分重叠，保持上下文连贯\n\n3. Embedding（向量化）\n   • 模型选择：BGE、M3E、text-embedding-ada-002\n   • 每个 Chunk 生成一个向量（1536 维或 1024 维）\n   • 存入向量数据库\n\n4. 向量数据库存储\n   • Milvus：开源，支持混合检索，适合大规模\n   • Pinecone：云服务，开箱即用\n   • Weaviate：支持混合检索（向量+关键词）\n\n5. 检索时\n   Query → Embedding → 向量检索 → TopK 相似块 → 上下文拼接 → LLM → 回答\n\n在风控系统的应用：\n• 风控政策问答：输入风控规则文档，问「这个用户符合什么规则」\n• 案例解读：输入用户行为，问「这个用户有什么风险特征」\n• 规则解释：为什么这个请求被拦截？调取相关规则文档",
+        "followUp": [
+          {
+            "question": "Embedding 模型用的什么？",
+            "answer": "Embedding模型选型：中文场景推荐BGE-large-zh（M3E-large），支持中英双语，维度1024或1536；英文场景用text-embedding-ada-002（OpenAI）或Cohere。模型对比：BGE基于BERT架构，在中文语义理解上优于M3E；M3E专门针对中文Embedding优化，推理速度快。选型依据：任务类型（相似度搜索vs分类）、延迟要求、部署成本。部署方案：在线推理用ONNX Runtime加速，批量处理用GPU。评估指标：Recall@K（召回率）、cosine similarity准确率。"
+          },
+          {
+            "question": "分块大小怎么选？",
+            "answer": "Embedding分块大小选择：1）通常500-1000 tokens（中文约250-500字）；2）简单内容用小chunk（如条款、问答），复杂内容用大chunk（如文章、报告）；3）重叠分块：相邻chunk保留10%-20%重叠，保持上下文连贯。选型依据：1）文档长度分布；2）查询长度和复杂度；3）Embedding模型上下文窗口大小。实践：先用默认chunk size实验，根据召回质量调整。chunk太大：引入噪声，稀释关键信息；chunk太小：丢失上下文，召回片段不完整。"
+          },
+          {
+            "question": "向量数据库怎么选型？",
+            "answer": "向量数据库选型：Milvus（开源、功能全、支持混合检索，适合10亿+规模）；Pinecone（云服务免运维，数据量中等）；Chroma（轻量Python原生，适合实验）；Weaviate（支持混合检索+关键词）；Qdrant（Rust实现，高性能低延迟）。选型依据：数据量、并发需求、是否需要混合检索。生产环境推荐Milvus（自部署）或Pinecone（云服务）。性能指标：QPS、延迟、召回率。关键配置：索引类型（IVF/HNSW）、nlist（聚类数）、nprobe（搜索聚类数）。"
+          },
+          {
+            "question": "召回率怎么提升？",
+            "answer": "召回率提升方法：1）Hybrid Search：向量检索+关键词检索结合，Weaviate/Pinecone支持；2）Rerank：对TopK结果用更精确的模型重排（如CrossEncoder）；3）Query改写：扩展Query同义词、领域词；4）索引优化：增加nlist/聚类数，提高召回精度；5）重排序rerank：先粗召回100条，再用CrossEncoder精排到20条。评估指标：Recall@K（K通常取10-100）。实战：某风控场景，单独向量检索召回率75%，混合检索召回率92%。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch7_q7",
+      "chapterId": "ch7",
+      "number": 7,
+      "title": "毛利计算的核心逻辑是什么？",
+      "difficulty": "intermediate",
+      "labels": [
+        "高频追问"
+      ],
+      "answer": {
+        "content": "核心公式：\n\n毛利 = 收入 - 成本\n实付金额 = 毛利约束下的最大化\n\n毛利计算涉及的因素：\n\n1. 收入端\n   • 订单金额（用户实际支付）\n   • 平台抽成（抽成比例）\n\n2. 成本端\n   • 司机端定价（根据距离、时间、供需系数计算）\n   • 平台补贴（用户补贴、司机补贴）\n   • 优惠券核销\n   • 活动费用\n\n3. 复杂度来源\n   • 弹性定价：高峰期倍率、天气溢价\n   • 城市差异化：一线城市 vs 二线城市定价不同\n   • 补贴策略：拉新补贴、留存补贴、沉默补贴\n   • 抽成比例：不同城市、不同时段抽成不同\n\n毛利引擎架构：\n\n策略配置中心 → 策略执行引擎 → 毛利计算服务 → 实时计算\n                     ↓\n              规则引擎（计算各项成本）\n                     ↓\n              毛利校验（是否亏损）\n                     ↓\n              决策：执行/降级/拒绝",
+        "followUp": [
+          {
+            "question": "毛利引擎的设计架构？",
+            "answer": "毛利引擎架构：1）策略配置中心（Apollo配置）：存储毛利计算规则（抽成比例、补贴规则、城市系数）；2）策略执行引擎：规则引擎执行策略，返回各项成本明细；3）毛利计算服务：根据策略结果计算毛利；4）实时计算层：Flink计算实时毛利指标；5）毛利校验层：毛利为负时触发降级或拒绝。关键设计：策略与计算分离，方便调整策略而不改代码；多层缓存加速策略读取；降级预案保证核心功能可用。"
+          },
+          {
+            "question": "策略服务怎么工作的？",
+            "answer": "策略服务工作流程：1）策略配置化，存储在配置中心（Apollo）；2）策略版本管理，支持灰度发布和快速回滚；3）策略预加载到本地缓存，热更新不阻塞；4）规则执行时按优先级遍历匹配规则；5）命中规则后执行业务动作（PASS/REJECT/降级）。技术要点：策略引擎用Drools或自研（如Chopper）；表达式引擎支持Jexl/Aviator；策略执行结果写入日志供审计。"
+          },
+          {
+            "question": "毛利为负怎么处理？",
+            "answer": "毛利为负的处理策略：1）实时拦截，毛利计算结果为负时拒绝订单或触发人工审核；2）预警告警，毛利率低于阈值时通知运营；3）降级策略，毛利服务不可用时使用历史毛利或固定毛利；4）调价触发，当毛利持续为负时触发调价机制。监控指标：毛利为负订单占比（应小于1%）、单均毛利额分布。根因分析：补贴力度过大？抽成比例过低？司机端定价过高？需要运营和算法协同优化。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch8_q1",
+      "chapterId": "ch8",
+      "number": 1,
+      "title": "万级 QPS 是怎么扛住的？核心链路 50ms 怎么做到的？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解",
+        "设计能力"
+      ],
+      "answer": {
+        "content": "优化手段：\n\n1. 缓存（多级缓存）\n   • 本地缓存（Caffeine/Guava Cache）：热点数据，TTL 短\n   • Redis 分布式缓存：跨节点共享\n   • 缓存命中率 > 95%\n\n2. 异步化\n   • 非核心链路异步：日志、监控、通知\n   • 异步消息队列：Kafka 解耦\n   • CompletableFuture 编排\n\n3. 预计算\n   • 提前算好热点数据（如：某城市某时段的预估价格）\n   • 预热：系统启动时加载热点数据\n\n4. 拆分\n   • 核心链路和非核心链路分离\n   • 核心链路：毛利计算（50ms）\n   • 非核心链路：日志写入（异步）\n\n5. 轻量化\n   • 精简中间件依赖（去掉不必要的 RPC）\n   • 直连数据库（避免多跳）\n   • 使用高性能库（FastJson → Gson/Jackson）\n\n6. 并行化\n   • 无关依赖并行获取\n   • CompletableFuture.allOf() 合并结果\n\n50ms 响应时间的组成：\n• 网络开销：5-10ms\n• 缓存查询：1-2ms\n• 特征计算：10-15ms\n• 规则执行：5-10ms\n• 毛利计算：10-15ms\n• 数据库查询：5-10ms（尽量避免）",
+        "followUp": [
+          {
+            "question": "缓存的更新策略？写穿透还是淘汰？",
+            "answer": "缓存更新策略：1）Cache-Aside（旁路缓存）：读时先读缓存，未命中查库并写入缓存；写时先更新数据库，再删除缓存（不是更新）。2）Write-Through：写缓存和数据库同步完成。3）Write-Behind：异步写入数据库。4）Read-Through：缓存未命中时自动加载。生产环境推荐Cache-Aside（最常用）或异步写（高并发场景）。更新vs删除：更新缓存有并发问题（线程A更新缓存同时线程B读取，获取到旧值），删除缓存更安全。"
+          },
+          {
+            "question": "热点数据怎么识别和处理？",
+            "answer": "热点数据识别：1）实时监控Redis访问频率，Key访问次数TopN；2）本地缓存记录访问计数，定时上报；3）数据分析识别（如某明星商品、热门活动）。热点处理：1）本地缓存（Caffeine），热点数据缓存到JVM堆，毫秒级访问；2）多级缓存，本地+Redis；3）热点Key打散，同一Key加随机后缀分发到不同节点；4）热点探测+熔断降级。注意事项：本地缓存需要解决更新一致性问题（缓存失效策略）。"
+          },
+          {
+            "question": "有没有遇到过缓存失效的瞬间击穿？",
+            "answer": "缓存击穿场景和解决方案：场景：热点Key过期瞬间，大量并发同时查库。解决方案：1）分布式锁，获取锁的线程去查库并更新缓存，其他线程等待；2）逻辑过期，热点数据永不过期，但设置逻辑过期时间，后台线程异步更新；3）互斥锁，类似分布式锁但用SET NX实现。实战选择：缓存击穿危害小于缓存雪崩，互斥锁方案简单有效；逻辑过期方案性能最好但实现复杂。风控系统对延迟敏感，用分布式锁+本地缓存组合。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch8_q2",
+      "chapterId": "ch8",
+      "number": 2,
+      "title": "毛利系统的稳定性保障怎么做的？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "保障措施：\n\n1. Sentinel 限流降级\n   • QPS 限流：超过阈值拒绝请求，返回默认结果\n   • 熔断降级：下游服务超时/异常，自动降级\n   • 自适应限流：根据 CPU 使用率、响应时间自动调整\n\n2. 监控告警\n   • 实时大盘（Grafana）：QPS、响应时间（P50/P99/P999）、错误率\n   • 毛利异常监控：毛利为负的订单占比超过阈值告警\n   • 指标：订单量、实付金额、毛利额、毛利率\n\n3. 巡检和值班机制\n   • 每日巡检：核心指标波动检查\n   • On-Call 值班：7x24 小时有人响应\n   • 故障复盘：P2 以上故障 24 小时内输出报告\n\n4. 降级预案\n   • 毛利计算降级：毛利服务不可用时，使用上一天毛利或固定毛利\n   • 减少重试：降级期间减少对下游的调用\n   • 紧急开关：人工介入，可快速关闭毛利约束",
+        "followUp": [
+          {
+            "question": "限流阈值怎么定的？",
+            "answer": "限流阈值制定方法：1）基于历史数据，计算95分位QPS作为基准；2）留20%-30%buffer作为阈值；3）根据服务能力（CPU/内存/线程池）反推最大QPS；4）压测确定系统极限。配置示例：核心接口10万QPS，普通接口5万QPS、单用户100QPS、单IP1000QPS。动态调整：流量突增时自动放宽（自适应限流）。监控：限流触发次数、资源利用率。"
+          },
+          {
+            "question": "降级的时候会影响核心业务吗？",
+            "answer": "降级对核心业务的影响：1）功能降级：关闭非核心功能（如推荐、统计），核心决策功能不受影响；2）数据降级：返回缓存数据或历史数据替代实时计算，保证决策不中断；3）限流降级：超出阈值的请求直接返回默认值，不阻塞主流程。好的降级设计：核心链路完全不受影响，非核心链路失败不影响决策结果。降级预案需定期演练，确保降级开关有效。"
+          },
+          {
+            "question": "毛利为负的订单怎么处理？",
+            "answer": "毛利为负订单处理：1）实时拦截，拒绝毛利为负的订单或转入人工审核；2）毛利预警，毛利率低于阈值时触发告警，运营介入调价；3）补贴上限控制，单均补贴不超过阈值；4）降级策略，毛利服务不可用时使用昨日平均毛利作为默认值。监控：毛利为负订单占比、单均毛利额分布、补贴总额。根因分析：补贴策略过激？抽成比例过低？需运营和算法协同调整。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch8_q3",
+      "chapterId": "ch8",
+      "number": 3,
+      "title": "Function Calling 在毛利系统里怎么用的？",
+      "difficulty": "advanced",
+      "labels": [],
+      "answer": {
+        "content": "应用场景：\n\n自然语言查询毛利信息\n• 「司机张三这周的抽成全过程」\n• 「为什么这笔订单毛利这么低？」\n• 「帮我查一下近7天毛利最高的10个城市」\n\n实现方式：\n\n1. 定义函数 Schema\n   ```json\n   {\n     \"name\": \"getDriverCommission\",\n     \"description\": \"获取司机抽成明细\",\n     \"parameters\": {\n       \"type\": \"object\",\n       \"properties\": {\n         \"driver_id\": { \"type\": \"string\" },\n         \"start_date\": { \"type\": \"string\" },\n         \"end_date\": { \"type\": \"string\" }\n       }\n     }\n   }\n   ```\n\n2. 用户 Query + Schema 给大模型\n   • Prompt：\"用户的问题是：...，可用的函数是：...\"\n\n3. 大模型提取参数\n   • 从用户 Query 中提取 driver_id、start_date、end_date\n\n4. 调用后端函数\n   • 后端执行 SQL 查询毛利系统数据库\n   • 返回结构化数据\n\n5. 返回结果给大模型\n   • 大模型用返回结果生成自然语言回答\n   • 回答：「司机张三本周抽成共计 580 元，其中平台抽成 20%，具体明细如下...」",
+        "followUp": [
+          {
+            "question": "Function Calling 的 Schema 怎么设计？",
+            "answer": "Function Calling Schema设计：1）描述清晰，name用动词+名词（如getDriverCommission），description说明用途；2）参数精简，只暴露必要字段，避免过度暴露底层表结构；3）类型明确，parameters定义每个字段的类型和是否必填；4）安全考虑，不返回敏感字段（如密码、token）。示例：getDriverCommission(driver_id, start_date, end_date)返回司机抽成明细。设计原则：面向业务能力而非技术实现，让LLM容易理解和使用。"
+          },
+          {
+            "question": "大模型提取参数不准确怎么办？",
+            "answer": "大模型参数提取不准确解决：1）Few-shot示例，Prompt中提供2-3个提取示例；2）明确输出格式，要求返回JSON并包含置信度；3）参数校验，提取后校验参数合法性，不合法要求重试；4）多轮对话，首次提取失败时追问确认；5）降级方案，提取失败时使用默认参数或转人工处理。实践：先用简单Schema测试LLM提取准确率，通常简单字段（日期、ID）提取较准确，复杂语义字段需优化Prompt。"
+          },
+          {
+            "question": "你们用的什么模型支持 Function Calling？",
+            "answer": "支持Function Calling的模型：GPT-4（OpenAI）、Claude 3（Anthropic）、Qwen（阿里通义）、GLM-4（智谱）。选型依据：1）Function Calling能力（部分模型支持不完善）；2）成本和延迟；3）国内使用合规性。推荐：GPT-4效果最好但需境外API；国内场景用Qwen或GLM-4。Claude 3的Function Calling支持较好，但需要通过API代理访问。关键：模型需要fine-tuning才能在垂直领域达到高准确率。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch9_q1",
+      "chapterId": "ch9",
+      "number": 1,
+      "title": "仿真系统是怎么设计的？",
+      "difficulty": "advanced",
+      "labels": [
+        "设计能力"
+      ],
+      "answer": {
+        "content": "核心能力：\n\n1. 配置驱动的任务编排\n   • 用户定义仿真场景（输入参数、策略配置）\n   • 系统按配置自动执行仿真任务\n   • 支持批量参数扫描（Grid Search）\n\n2. 多策略版本对比\n   • A/B 策略同时仿真，对比效果\n   • 新旧策略横向对比\n   • 可视化展示差异\n\n3. 批量超参搜索\n   • 参数范围定义：learning_rate ∈ [0.001, 0.01]\n   • 系统自动组合参数，批量提交仿真\n   • 输出参数-效果曲线\n\n4. 百亿级历史数据回放\n   • 历史请求回放到仿真系统\n   • 用真实流量验证策略效果\n   • 离线仿真，不影响线上\n\n技术挑战：\n\n1. 计算资源管理\n   • 仿真任务调度（YARN/Kubernetes）\n   • 资源隔离，避免任务互相影响\n\n2. 任务状态管理\n   • 仿真任务可能耗时很长（小时级）\n   • 状态持久化，断点续跑\n\n3. 结果存储和可视化\n   • 仿真结果量大（每次仿真 GB 级）\n   • 结果数据 OLAP 查询\n   • 图表可视化（ECharts）",
+        "followUp": [
+          {
+            "question": "仿真结果怎么存储和查询？",
+            "answer": "仿真结果存储：1）时序数据库（InfluxDB/TimescaleDB），存储指标时间序列；2）HDFS/Parquet存储原始数据，支持OLAP查询；3）MySQL存储仿真配置和元数据。查询：1）结果聚合用Spark SQL；2）可视化用Grafana+ECharts；3）明细查询用Presto/Trino。架构示例：仿真结果→Kafka→Flink实时聚合→InfluxDB→Grafana，同时原始数据→HDFS→Spark离线分析。关键：仿真数据量大（每次GB级），需规划好存储生命周期和分区策略。"
+          },
+          {
+            "question": "仿真系统的延迟是多少？",
+            "answer": "仿真系统延迟范围：1）单机仿真：秒级到分钟级（取决于模型复杂度和数据量）；2）分布式仿真：秒级（并行处理）；3）实时仿真回放：取决于历史数据回放速度。延迟优化：1）预计算热点场景结果；2）增量仿真，只计算变化的参数组合；3）模型缓存，相同输入直接返回结果；4）异步处理，请求入队列后异步返回结果。"
+          },
+          {
+            "question": "你们用的什么计算资源？",
+            "answer": "计算资源选型：1）YARN/Kubernetes管理集群资源；2）Flink on K8s适合实时任务；3）Spark on YARN适合批处理任务；4）GPU集群用于模型推理。资源配置：CPU任务用普通计算节点（16核64GB），GPU任务用GPU节点（V100/A100）。调度策略：实时任务高优先级优先调度，批处理任务低优先级错峰运行。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch9_q2",
+      "chapterId": "ch9",
+      "number": 2,
+      "title": "Spark AQE 优化具体用了哪些？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "AQE（Adaptive Query Execution）四项优化：\n\n1. 动态分区合并\n   • Shuffle 后的分区数可能不均匀（倾斜）\n   • AQE 自动检测，将小分区合并\n   • 减少小文件问题\n\n2. 动态调整 Join 策略\n   • 小表 JOIN 大表：自动提升为 BroadcastHashJoin\n   • 不需要人工指定 broadcast 参数\n   • AQE 会根据运行时统计信息判断\n\n3. 动态处理数据倾斜\n   • 自动检测倾斜分区（某个分区数据量 > 中位数 5 倍）\n   • 将倾斜分区拆分成小分区，分别处理\n   • 避免个别 Task 耗时过长\n\n4. 动态调整并行度\n   • 根据数据量调整 Reduce Task 数量\n   • 数据量小时减少 Task 数量，减少调度开销\n\n配置启用：\nspark.sql.adaptive.enabled = true\nspark.sql.adaptive.coalescePartitions.enabled = true\nspark.sql.adaptive.skewJoin.enabled = true\n\n实际效果：\n• 某 ETL 任务从 2 小时降到 40 分钟\n• 减少了手动调参的工作",
+        "followUp": [
+          {
+            "question": "Shuffle 分区数怎么配置？",
+            "answer": "Spark Shuffle分区数配置：1）spark.sql.shuffle.partitions默认200，数据量小可减少到50，数据量大增加到500-1000；2）分区数=数据量/目标分区大小（建议256MB）；3）分区数过少导致数据倾斜，分区数过多增加调度开销。调整方法：spark.sql.shuffle.partitions参数。监控：观察Task数据量分布是否均匀。"
+          },
+          {
+            "question": "小文件治理怎么做的？",
+            "answer": "小文件治理：1）输出前coalesce/repartition合并分区；2）配置hive.merge.mapfiles和hive.merge.mapredfiles合并小文件；3）动态分区合理设置，避免产生过多小分区；4）定期归档历史小文件到HAR。"
+          },
+          {
+            "question": "你们 AQE 开启后效果怎么样？",
+            "answer": "AQE优化效果案例：1）动态分区合并，某ETL任务从1500个分区自动合并到50个，减少小文件问题，执行时间从2小时降到40分钟；2）动态Join策略，小表自动广播，省去手动指定broadcast；3）动态处理数据倾斜，检测到倾斜分区后自动拆分，Task时间从30分钟降到2分钟。配置：spark.sql.adaptive.enabled=true，spark.sql.adaptive.coalescePartitions.enabled=true。效果监控：观察SQL执行时间分布、Shuffle数据量分布。经验：AQE对ETL任务优化效果显著，对简单查询效果一般。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch9_q3",
+      "chapterId": "ch9",
+      "number": 3,
+      "title": "LangChain Agent 在仿真系统里具体做什么？",
+      "difficulty": "advanced",
+      "labels": [],
+      "answer": {
+        "content": "应用场景：\n\n1. 仿真结果自动解读\n   • 输入：「为什么新策略A的拦截率比旧策略高 5%？」\n   • Agent 自动分析仿真日志，找出关键差异点\n   • 输出：「因为新策略对 XX 特征做了调整，导致 XX 人群拦截增加」\n\n2. 多策略版本聚合指标对比\n   • 聚合多个策略的多项指标\n   • 生成对比报告：表格 + 图表 + 文字解读\n\n3. 自动归因分析\n   • 效果波动 → 自动归因到特征/规则/阈值变化\n   • 「今天拦截率上升 3%，原因是 XX 规则的阈值被调低了」\n\n4. 生成可读报告\n   • 将仿真数据转成自然语言报告\n   • 非技术人员也能看懂\n\nAgent 设计：\n\n1. 工具定义（Tools）\n   • 查询数据库（SQL）\n   • 读取文件（CSV/H JSON）\n   • 执行 Python 脚本（数据分析）\n   • 调用 API（获取配置）\n\n2. 提示词工程（Prompt）\n   • Role：你是专业的风控策略分析师\n   • Context：提供背景知识（仿真系统架构、指标定义）\n   • Task：用户的问题\n   • Output Format：结构化的分析报告\n\n3. ReAct 模式\n   • Thought：思考需要什么数据\n   • Action：调用工具获取数据\n   • Observation：观察结果\n   • 循环直到得出结论",
+        "followUp": [
+          {
+            "question": "Agent 幻觉问题怎么解决？",
+            "answer": "Agent幻觉解决：1）提供明确的上下文和约束条件；2）工具返回结果后要求LLM引用具体数据；3）设置置信度阈值，低置信度时要求复核或转人工；4）多次采样取多数结果；5）使用RAG增强，强制LLM基于检索内容回答。"
+          },
+          {
+            "question": "Tool Calling 的 Schema 怎么设计？",
+            "answer": "Tool Calling Schema设计原则：1）name用动词描述操作；2）description清晰说明用途；3）parameters只包含必要字段；4）示例提供2-3个使用示例；5）复杂操作拆分为多个简单工具。"
+          },
+          {
+            "question": "你们用的什么模型？",
+            "answer": "模型选型依据：GPT-4效果最好但需境外API，Claude 3效果好但需API代理；国内场景推荐Qwen（阿里通义）或GLM-4（智谱）。选型考虑因素：1）Function Calling能力是否完善；2）成本和延迟；3）国内使用合规性。实际项目中根据是否需要代理、预算限制、效果要求综合选择。建议：核心业务用Qwen/GLM-4，实验性功能可用GPT-4/Claude测试。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch10_q1",
+      "chapterId": "ch10",
+      "number": 1,
+      "title": "设计一个实时风控系统，支持每秒10万请求，100ms内返回",
+      "difficulty": "advanced",
+      "labels": [
+        "必须掌握",
+        "设计能力"
+      ],
+      "answer": {
+        "content": "整体架构：\n\n用户请求 → API Gateway → 负载均衡 → 风控节点集群\n                                       ↓\n                               规则引擎（本地缓存）← 特征服务（Redis）\n                                       ↓\n                               模型推理（Flink）← 实时特征（Kafka → Flink）\n                                       ↓\n                               存储（ES/HBase）\n                                       ↓\n                               监控大盘（Grafana）\n\n关键设计：\n\n1. 分层缓存（两级缓存）\n   • L1 本地缓存（Caffeine）：热点规则、热点特征，TTL 1min\n   • L2 Redis 缓存：特征数据，TTL 5min\n   • 缓存命中率 > 95%\n\n2. 特征预计算\n   • 离线提前算好常用特征\n   • 请求时直接查缓存，减少实时计算\n\n3. 规则引擎预编译\n   • 规则编译成字节码，缓存 AST\n   • 规则执行直接走缓存结果\n\n4. 异步写日志\n   • 风控结果异步写入 Kafka，不阻塞主流程\n   • 后续再消费 Kafka 写入 ES/HBase\n\n5. 读写分离\n   • 写：实时链路（快）\n   • 读：历史数据查询（走 ES/HBase）\n\n6. 模型加速\n   • 模型结果缓存（输入 → 输出的映射）\n   • 轻量模型优先，重模型异步\n\n100ms 如何做到：\n• 缓存命中率 > 95%（大部分请求直接命中）\n• 规则引擎 < 10ms\n• 特征服务 < 30ms（并行获取）\n• 模型推理 < 20ms（轻量模型）\n• 预留 10-20ms 余量",
+        "followUp": [
+          {
+            "question": "特征服务挂了怎么办？",
+            "answer": "这个问题考察的是设计一个实时风控系统，支持每秒10万请求，100ms内返回相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "怎么做到 99.9% 在 100ms 内？",
+            "answer": "这个问题考察的是设计一个实时风控系统，支持每秒10万请求，100ms内返回相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Redis 缓存和本地缓存怎么选？",
+            "answer": "这个问题考察的是设计一个实时风控系统，支持每秒10万请求，100ms内返回相关的深度理解。意向锁是表级锁，IX表示事务想要获取某行的排他锁，IS表示事务想要获取某行的共享锁。作用是在加行锁前快速判断是否有其他事务锁住了整张表，避免逐行检查。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch10_q2",
+      "chapterId": "ch10",
+      "number": 2,
+      "title": "如果一个接口突然变慢，怎么排查？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "排查步骤：\n\n1. 监控看报表面\n   • APM（SkyWalking/Pinpoint）：看链路耗时分布\n   • 数据库慢查询日志（MySQL slow_query_log）\n   • Redis Slow Log（slowlog get 10）\n   • 系统层面：CPU、内存、IO、网络\n\n2. 代码层面\n   • 加日志/Trace（埋点）\n   • 火焰图（async-profiler）看 CPU 时间分布\n   • 找出耗时最长的方法\n\n3. 数据库排查\n   • explain 分析查询计划\n   • 查看索引是否生效（type/ref/const）\n   • 是否全表扫描（type=all）\n   • 连接池是否耗尽（show processlist）\n\n4. 缓存排查\n   • 是否缓存穿透（大量请求打到数据库）\n   • 是否大量缓存失效（缓存雪崩）\n   • 缓存命中率是否下降\n\n5. 外部依赖\n   • 下游服务是否超时/报错\n   • 第三方 API 响应是否变慢\n   • RPC 超时设置是否合理\n\nJava 特定排查命令：\n• jstack <pid>：查看线程状态，是否死锁、阻塞\n• jmap -histo <pid>：查看对象占用，排查内存泄漏\n• jstat -gc <pid>：查看 GC 频率，频繁 GC 导致停顿\n• Arthas：阿里开源的诊断工具，dashboard/trace/jad",
+        "followUp": [
+          {
+            "question": "你们用的什么 APM 工具？",
+            "answer": "这个问题考察的是如果一个接口突然变慢，怎么排查？相关的深度理解。需要根据具体场景选择。如果并发量不大、延迟要求不高，可以用简单方案；如果是大流量、低延迟场景，需要更精细的优化。核心是理解原理后根据实际需求做权衡。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有没有遇到过数据库连接池耗尽？",
+            "answer": "这个问题考察的是如果一个接口突然变慢，怎么排查？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "怎么定位是哪个接口慢？",
+            "answer": "这个问题考察的是如果一个接口突然变慢，怎么排查？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch10_q3",
+      "chapterId": "ch10",
+      "number": 3,
+      "title": "设计一个延迟任务调度系统",
+      "difficulty": "advanced",
+      "labels": [
+        "设计能力"
+      ],
+      "answer": {
+        "content": "方案对比：\n\n| 方案 | 优点 | 缺点 |\n|------|------|------|\n| Redis ZSet | 简单，支持分布式 | 数据量有限（内存限制） |\n| 消息队列 TTL | 利用 MQ 本身，无需额外组件 | 延迟精度差（秒级），不支持任意时间 |\n| 时间轮 | 高性能，时间精确 | 实现复杂，需要自行处理故障 |\n| 分布式调度中心（XXL-Job/ElasticJob）| 功能完善，支持任务管理、失败重试、可视化 | 运维成本高 |\n\nRedis ZSet 实现：\n```\n添加任务：ZADD delay:queue <timestamp> <task_id>\n获取到期任务：ZRANGEBYSCORE delay:queue 0 <current_timestamp>\n删除任务：ZREM delay:queue <task_id>\n```\n• 定时器每秒扫描 ZSet，取出到期任务\n• 多节点部署时需要分布式锁，避免重复消费\n\n分层时间轮：\n• 秒级时间轮：每格 1 秒，转一圈 60 秒\n• 分级时间轮：秒 → 分 → 时 → 天\n• 定时器只检查当前层，到期的任务往下沉\n• 减少定时器数量，提高性能\n\n时间轮算法核心：\n• 每个格子是一个双向链表，存储到期任务\n• 指针每格移动，执行链表中的任务\n• 任务到期时间超过当前轮转范围时，放入下一层时间轮",
+        "followUp": [
+          {
+            "question": "Redis ZSet 做延迟队列有什么问题？",
+            "answer": "这个问题考察的是设计一个延迟任务调度系统相关的深度理解。意向锁是表级锁，IX表示事务想要获取某行的排他锁，IS表示事务想要获取某行的共享锁。作用是在加行锁前快速判断是否有其他事务锁住了整张表，避免逐行检查。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "时间轮怎么实现故障恢复？",
+            "answer": "这个问题考察的是设计一个延迟任务调度系统相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "XXL-Job 的架构是怎样的？",
+            "answer": "这个问题考察的是设计一个延迟任务调度系统相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch10_q4",
+      "chapterId": "ch10",
+      "number": 4,
+      "title": "设计一个接口幂等方案",
+      "difficulty": "intermediate",
+      "labels": [
+        "设计能力"
+      ],
+      "answer": {
+        "content": "四种方案：\n\n1. 数据库唯一索引\n• 表设计：业务ID字段加唯一索引\n• 业务ID = 幂等 Key（如：订单支付 = user_id + order_id）\n• 重复请求插入时唯一索引冲突，报错\n• 优点：简单可靠\n• 缺点：只能用于有唯一业务ID的场景\n\n2. Redis 防重\n```\nSET key value NX EX 10s\n```\n• key = 幂等ID（如 order:pay:{order_id}）\n• NX = 不存在才设置（保证唯一）\n• EX 10s = 10秒过期（防泄漏）\n• 成功设置 → 继续执行；已存在 → 直接返回\n• 优点：性能高，支持分布式\n• 缺点：依赖 Redis，可用性要保证\n\n3. Token 机制\n• 步骤1：请求前获取 Token（POST /token）\n• 步骤2：请求时携带 Token（header 或 body）\n• 步骤3：服务端验证 Token 并删除（Lua 脚本保证原子性）\n• 步骤4：验证失败 → 重复请求\n• 优点：支持异步场景\n• 缺点：多一次 Token 获取请求\n\n4. 乐观锁/悲观锁\n• 乐观锁：version 字段控制，UPDATE SET ... WHERE version = oldVersion\n• 悲观锁：SELECT FOR UPDATE 锁定行（不推荐，阻塞）\n• 优点：不依赖外部组件\n• 缺点：数据库压力大",
+        "followUp": [
+          {
+            "question": "你们用的哪种幂等方案？",
+            "answer": "这个问题考察的是设计一个接口幂等方案相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Token 机制怎么保证原子性？",
+            "answer": "这个问题考察的是设计一个接口幂等方案相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "超时重试的幂等怎么处理？",
+            "answer": "这个问题考察的是设计一个接口幂等方案相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch11_q1",
+      "chapterId": "ch11",
+      "number": 1,
+      "title": "RAG 的核心流程？向量数据库怎么选型？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "RAG 核心流程：\n\n文档 → 解析 → 分块（Chunking）→ Embedding → 存入向量数据库\nQuery → Embedding → 向量检索（TopK）→ 上下文拼接 → LLM → 回答\n\n向量数据库选型：\n\n| 数据库 | 特点 | 适用场景 |\n|--------|------|----------|\n| Milvus | 开源，功能全，支持混合检索 | 大规模向量（10亿+），需要自部署 |\n| Pinecone | 云服务，无需运维 | 快速上线，数据量中等 |\n| Chroma | 轻量，Python 原生 | 实验/小规模，本地开发 |\n| Weaviate | 原生支持混合检索（向量+关键词）| 需要同时检索向量和文本 |\n| Qdrant | 开源，Rust 实现，高性能 | 对延迟敏感的场景 |\n\n选型依据：\n• 数据量 < 100 万 → Chroma 或 Pinecone\n• 数据量 100 万 ~ 10 亿 → Milvus 或 Qdrant\n• 需要混合检索 → Weaviate\n• 需要云服务免运维 → Pinecone\n\nEmbedding 模型选型：\n• 中文：BGE、BGE-large-zh、m3e-large\n• 英文：text-embedding-ada-002（OpenAI）、Cohere\n• 维度：通常 1024 或 1536 维\n\n检索优化：\n• Hybrid Search：向量检索 + 关键词检索 结合\n• Rerank：对 TopK 结果再做一次精细排序\n• Max Marginal Relevance：增加结果多样性，避免重复",
+        "followUp": [
+          {
+            "question": "Embedding 模型怎么选？",
+            "answer": "这个问题考察的是RAG 的核心流程？向量数据库怎么选型？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "检索召回率怎么提升？",
+            "answer": "召回率提升方法：1）Hybrid Search：向量检索+关键词检索结合，Weaviate/Pinecone支持；2）Rerank：对TopK结果用更精确的模型重排（如CrossEncoder）；3）Query改写：扩展Query同义词、领域词；4）索引优化：增加nlist/聚类数，提高召回精度；5）重排序rerank：先粗召回100条，再用CrossEncoder精排到20条。评估指标：Recall@K（K通常取10-100）。实战：某风控场景，单独向量检索召回率75%，混合检索召回率92%。"
+          },
+          {
+            "question": "Context 长度超限怎么处理？",
+            "answer": "这个问题考察的是RAG 的核心流程？向量数据库怎么选型？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch11_q2",
+      "chapterId": "ch11",
+      "number": 2,
+      "title": "Prompt 工程有哪些技巧？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "核心技巧：\n\n1. Few-shot（少样本示例）\n• 给出 2-3 个示例，让模型理解任务\n• 示例要覆盖正负样本\n• 示例格式要和实际输入一致\n\n2. Chain of Thought（思维链）\n• 让模型一步一步思考\n• 「请逐步分析这个问题」\n• 复杂推理任务效果显著\n\n3. 角色设定\n• 「你是一个资深的风控策略分析师」\n• 设定角色后，模型回答更专业\n\n4. 结构化输出\n• 「请按以下 JSON 格式输出：{...}」\n• 方便程序解析\n\n5. 分隔符\n• 用 ``` 或 ### 分隔指令和内容\n• 避免模型混淆指令和上下文\n\n6. 渐进式处理\n• 复杂任务拆成多步：\n  Step1: 提取关键信息\n  Step2: 查询相关信息\n  Step3: 生成回答\n\n7. 上下文压缩\n• 上下文太长会影响效果\n• 只保留最相关的上下文\n• 可以用 Context Compression 技术\n\n8. Temperature 控制\n• 0-1，越低越确定性\n• 事实性回答：Temperature = 0\n• 创意性回答：Temperature = 0.7",
+        "followUp": [
+          {
+            "question": "你们风控问答的 Prompt 怎么写的？",
+            "answer": "这个问题考察的是Prompt 工程有哪些技巧？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "怎么评估 Prompt 效果？",
+            "answer": "这个问题考察的是Prompt 工程有哪些技巧？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有哪些常见的 Prompt 反模式？",
+            "answer": "这个问题考察的是Prompt 工程有哪些技巧？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch11_q3",
+      "chapterId": "ch11",
+      "number": 3,
+      "title": "大模型在风控系统里有哪些具体应用？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "四大应用场景：\n\n1. 智能问答（拦截原因查询）\n• 用户问：「为什么我的订单被拦截？」\n• LLM 解析拦截原因，生成自然语言回答\n• 结合 RAG 从规则库检索相关条款\n\n2. 策略解读\n• 输入规则配置，LLM 解释规则含义\n• 帮助非技术人员理解决策引擎\n\n3. 报告生成\n• 仿真结果自动解读\n• 「新策略拦截率比旧策略高 5%，原因是...」\n• 自动生成日报、周报\n\n4. 数据查询（Function Calling）\n• 自然语言查询数据\n• 「查一下今天拦截率最高的 10 个城市」\n• LLM 解析意图，调用 SQL 生成接口\n\n5. 风险标签解释\n• 模型输出用户风险标签时，附带解释\n• 「该用户标签：套现嫌疑，置信度 85%」\n• 帮助审核人员快速决策\n\n效果评估：\n• 准确率：回答正确的比例\n• 召回率：应该回答的问题被正确回答的比例\n• 用户满意度：客服工单减少量\n• 响应时间：P99 < 3s",
+        "followUp": [
+          {
+            "question": "LLM 幻觉问题在风控场景怎么处理？",
+            "answer": "这个问题考察的是大模型在风控系统里有哪些具体应用？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "模型的响应延迟怎么优化？",
+            "answer": "这个问题考察的是大模型在风控系统里有哪些具体应用？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "你们用的什么模型？",
+            "answer": "模型选型依据：GPT-4效果最好但需境外API，Claude 3效果好但需API代理；国内场景推荐Qwen（阿里通义）或GLM-4（智谱）。选型考虑因素：1）Function Calling能力是否完善；2）成本和延迟；3）国内使用合规性。实际项目中根据是否需要代理、预算限制、效果要求综合选择。建议：核心业务用Qwen/GLM-4，实验性功能可用GPT-4/Claude测试。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch12_q1",
+      "chapterId": "ch12",
+      "number": 1,
+      "title": "0到1建设的时候，技术选型是怎么拍的板？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "技术选型考量维度：\n\n1. 业务需求\n   • 功能满足度：技术栈能否支持业务需求\n   • 性能要求：QPS、延迟、数据量\n   • SLA 要求：99.9% 还是 99.99%\n\n2. 团队能力\n   • 学习成本：团队是否熟悉该技术\n   • 招聘难度：市场人才池大小\n   • 文档完备度：官方文档、社区活跃度\n\n3. 生态成熟度\n   • 社区活跃度：GitHub star、issue 响应速度\n   • 版本稳定性：生产验证案例\n   • 生态工具：配套工具是否完善\n\n4. 运维成本\n   • 部署复杂度\n   • 监控告警是否完善\n   • 容灾备份方案\n\n5. 成本\n   • License 费用\n   • 硬件资源需求\n   • 人力维护成本\n\n6. 扩展性\n   • 未来扩展预留\n   • 是否容易被替代\n\n踩坑经历（举例）：\n• 选型时没考虑到团队学习曲线，导致延期\n• 选了新兴框架，生产验证不足，遇到 bug 社区解决不了\n• 选了重量级方案，实际业务不需要，运维成本高",
+        "followUp": [
+          {
+            "question": "你们技术选型是怎么做的？有评审流程吗？",
+            "answer": "这个问题考察的是0到1建设的时候，技术选型是怎么拍的板？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有没有选错技术栈的经历？",
+            "answer": "这个问题考察的是0到1建设的时候，技术选型是怎么拍的板？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch12_q2",
+      "chapterId": "ch12",
+      "number": 2,
+      "title": "微服务拆分原则？服务拆太细有什么问题？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "拆分原则：\n\n1. 单一职责\n   • 一个服务只负责一块业务能力\n   • 高内聚，低耦合\n\n2. 业务边界清晰\n   • 根据业务领域划分（如：用户服务、订单服务）\n   • 跨业务调用走同步 RPC 或异步消息\n\n3. 独立部署\n   • 服务之间不能有代码依赖\n   • 独立版本，独立发布\n\n4. 数据隔离\n   • 每个服务独立数据库\n   • 不能跨库 JOIN（走 API 或消息同步）\n\n服务拆太细的问题：\n\n1. 服务治理复杂度上升\n   • 服务数量多，运维负担重\n   • 链路变长，排查问题困难\n\n2. 调用链路变长\n   • 一次请求可能涉及 10+ 服务\n   • 网络开销增加，延迟上升\n\n3. 分布式事务问题\n   • 跨服务事务无法用本地事务保证\n   • 需要引入 Seata/TCC 等方案\n\n4. 运维成本增加\n   • 每个服务都要监控、告警、容灾\n   • 需要服务发现、负载均衡、熔断降级\n\n5. 团队协作成本\n   • 跨团队沟通成本增加\n   • 接口版本管理复杂\n\n微服务 vs 模块化：\n• 初期业务不确定时，可以先模块化\n• 业务稳定、团队扩大后再拆分微服务",
+        "followUp": [
+          {
+            "question": "你们风控系统是怎么拆的？",
+            "answer": "这个问题考察的是微服务拆分原则？服务拆太细有什么问题？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "服务间通信用的同步还是异步？",
+            "answer": "这个问题考察的是微服务拆分原则？服务拆太细有什么问题？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有没有遇到微服务拆分过细的问题？",
+            "answer": "这个问题考察的是微服务拆分原则？服务拆太细有什么问题？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch12_q3",
+      "chapterId": "ch12",
+      "number": 3,
+      "title": "分布式事务怎么处理的？",
+      "difficulty": "advanced",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "方案对比：\n\n| 方案 | 特点 | 适用场景 |\n|------|------|----------|\n| 2PC | 强一致，但性能差，协调者挂掉会阻塞 | 严格要求一致性的场景 |\n| TCC | 业务补偿，性能好，但侵入性强 | 高性能要求 |\n| 本地消息表 | 最终一致，实现简单 | 最终一致即可 |\n| Saga | 编排式，长事务 | 长流程事务 |\n| Seata AT | 无侵入，埋点自动处理 | 不想改代码的场景 |\n\nTCC 模式：\n• Try：预留资源（锁定）\n• Confirm：确认执行（释放锁定）\n• Cancel：取消执行（回滚）\n\n空回滚：Try 没执行，Cancel 就执行了\n• 解决：记录分布式事务状态，Cancel 时检查\n\n悬挂：Cancel 比 Try 先执行\n• 解决：同样需要状态记录\n\n本地消息表：\n• A 操作和消息插入在同一个本地事务\n• 定时任务扫描未发送的消息，重试发送\n• 消费者幂等处理\n• 优点：实现简单，不依赖外部组件\n\nSaga 模式：\n• 将长事务拆成多个本地事务\n• 每个本地事务有对应的补偿操作\n• 正向执行器 + 补偿执行器\n• 编排器决定执行顺序",
+        "followUp": [
+          {
+            "question": "TCC 的空回滚和悬挂问题怎么解决？",
+            "answer": "这个问题考察的是分布式事务怎么处理的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "你们用的什么方案？",
+            "answer": "这个问题考察的是分布式事务怎么处理的？相关的深度理解。需要根据具体场景选择。如果并发量不大、延迟要求不高，可以用简单方案；如果是大流量、低延迟场景，需要更精细的优化。核心是理解原理后根据实际需求做权衡。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "Seata AT 模式是怎么实现的？",
+            "answer": "这个问题考察的是分布式事务怎么处理的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch12_q4",
+      "chapterId": "ch12",
+      "number": 4,
+      "title": "如何保证系统的高可用？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "高可用手段：\n\n1. 冗余部署\n   • 多副本部署（至少 2 个）\n   • 跨机房/跨 AZ 部署\n   • 主备切换\n\n2. 降级\n   • 非核心功能降级，减少资源消耗\n   • 开关降级：人工关闭某功能\n   • 自动降级：根据负载自动关闭\n\n3. 熔断\n   • 防止级联故障\n   • 线程隔离：不同业务用不同线程池\n   • 熔断器：连续失败后快速失败，不再调用下游\n\n4. 限流\n   • 保护系统不被冲垮\n   • 限流算法：令牌桶、滑动窗口\n   • 限流维度：IP、UserId、接口\n\n5. 隔离\n   • 故障隔离：单个服务故障不影响全局\n   • 线程池隔离：Hystrix 线程池隔离\n   • 进程隔离：Docker 容器\n\n6. 监控告警\n   • 全链路监控（APM）\n   • 指标监控（Metrics）\n   • 日志监控\n   • 告警分级：P0-P4，不同级别不同响应方式\n\n7. 预案\n   • 故障应急预案文档化\n   • 定期演练\n   • 故障复盘",
+        "followUp": [
+          {
+            "question": "你们的 SLA 目标是多少？",
+            "answer": "这个问题考察的是如何保证系统的高可用？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有做过混沌工程吗？",
+            "answer": "这个问题考察的是如何保证系统的高可用？相关的深度理解。是的，这是正确的理解。这个机制在生产环境中广泛应用，能够有效解决对应的技术问题。但需要注意具体实现的细节和边界条件，确保在所有场景下都能正常工作。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "降级和熔断的区别是什么？",
+            "answer": "这个问题考察的是如何保证系统的高可用？相关的深度理解。需要根据具体场景选择。如果并发量不大、延迟要求不高，可以用简单方案；如果是大流量、低延迟场景，需要更精细的优化。核心是理解原理后根据实际需求做权衡。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch12_q5",
+      "chapterId": "ch12",
+      "number": 5,
+      "title": "如何保证系统的可扩展性？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "扩展性手段：\n\n1. 拆分\n   • 水平拆分：分库分表，水平扩展数据库\n   • 垂直拆分：按业务领域拆微服务\n   • 功能拆分：核心/非核心分离\n\n2. 分层架构\n   • 清晰的分层（网关层 → 业务层 → 数据层）\n   • 每层独立扩展\n\n3. 接口抽象\n   • 依赖接口而非实现\n   • 策略模式、工厂模式\n   • 新增实现不修改现有代码\n\n4. 配置化\n   • 业务参数配置化（开关、阈值、规则）\n   • 规则引擎代替硬编码\n   • 动态配置中心（Apollo/Nacos）\n\n5. 插件化\n   • 预留扩展点\n   • 插件机制（SPI）\n   • 例如： фильтр、拦截器、责任链\n\n6. 异步化\n   • 非核心链路异步\n   • 消息队列解耦\n   • 削峰填谷\n\n7. 缓存\n   • 多级缓存\n   • 缓存命中率优化\n   • 缓存失效策略\n\n怎么应对业务快速变化：\n• 复用：抽象公共能力\n• 规则引擎：业务规则配置化\n• 插件机制：新功能以插件方式接入\n• 微内核架构：核心稳定，外围灵活",
+        "followUp": [
+          {
+            "question": "你们的架构有哪些扩展点？",
+            "answer": "这个问题考察的是如何保证系统的可扩展性？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "怎么应对业务快速变化？",
+            "answer": "这个问题考察的是如何保证系统的可扩展性？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "规则引擎是怎么设计的？",
+            "answer": "这个问题考察的是如何保证系统的可扩展性？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch13_q1",
+      "chapterId": "ch13",
+      "number": 1,
+      "title": "你在团队里是怎么带人的？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "带人方法：\n\n1. 目标对齐\n   • 让团队知道为什么做（不只是做什么）\n   • 目标拆解到个人，KPI 透明\n   • 定期 1:1 沟通目标进度\n\n2. 技术辅导\n   • Code Review：不是挑刺，是帮助成长\n   • Pair Programming：复杂任务一起做\n   • 技术分享：每人每月一次分享\n   • 指定导师：新人和 senior结对\n\n3. 成长路径\n   • T 字形人才：广度 + 深度\n   • 为每个人制定 IDP（个人发展计划）\n   • 给挑战性任务，但不越级管理\n\n4. 授权信任\n   • 给空间成长，不要事事过问\n   • 允许犯错，但不重复犯同一个错\n   • 信任是双向的\n\n5. 及时反馈\n   • 做得好及时认可（公开表扬）\n   • 问题及时指出（私下沟通）\n   • 反馈要具体，不只是评价\n\n6. 梯队建设\n   • 培养备选 leader\n   • 不把知识集中在一个人身上\n   • 知识文档化",
+        "followUp": [
+          {
+            "question": "团队有多少人？怎么分工的？",
+            "answer": "这个问题考察的是你在团队里是怎么带人的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "怎么培养新人的？",
+            "answer": "这个问题考察的是你在团队里是怎么带人的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有人要离职是怎么处理的？",
+            "answer": "这个问题考察的是你在团队里是怎么带人的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch13_q2",
+      "chapterId": "ch13",
+      "number": 2,
+      "title": "技术方案是怎么评审的？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "评审流程：\n\n1. 设计阶段\n   • 方案文档：架构图、数据流图、接口设计\n   • 评审申请：提前发出文档，给评审者时间看\n   • 评审材料要完整：背景、方案、代价、风险\n\n2. 评审会\n   • 相关方参与：PM、后端、前端、测试、运维\n   • 主持人：方案负责人\n   • 记录人：记录问题和结论\n\n3. Review 要点\n   • 功能完整性：需求是否全覆盖\n   • 技术可行性：团队能力是否匹配\n   • 性能影响：QPS、延迟、资源消耗\n   • 安全风险：数据安全、接口鉴权\n   • 扩展性：未来需求变化能否应对\n   • 运维成本：部署、监控、容灾\n   • 兼容性：是否影响现有功能\n\n4. 评审结论\n   • 通过：可以开始实现\n   • 有条件通过：少量问题，修复后开始\n   • 拒绝：方案不可行，需要重新设计\n\n5. 纪要和跟进\n   • 评审纪要发出\n   • 问题修复后通知评审者\n   • 实现时按评审结论执行",
+        "followUp": [
+          {
+            "question": "评审会上遇到过分歧吗？怎么解决的？",
+            "answer": "这个问题考察的是技术方案是怎么评审的？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "评审的频率是什么样的？",
+            "answer": "这个问题考察的是技术方案是怎么评审的？相关的深度理解。需要根据具体场景选择。如果并发量不大、延迟要求不高，可以用简单方案；如果是大流量、低延迟场景，需要更精细的优化。核心是理解原理后根据实际需求做权衡。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "评审文档一般多长？",
+            "answer": "这个问题考察的是技术方案是怎么评审的？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch13_q3",
+      "chapterId": "ch13",
+      "number": 3,
+      "title": "怎么平衡技术债和业务进度？",
+      "difficulty": "intermediate",
+      "labels": [],
+      "answer": {
+        "content": "平衡策略：\n\n1. 识别\n   • 什么是真正的技术债：影响业务的技术债 vs 完美的代码洁癖\n   • 区分：必须还的债 vs 可以等的债\n   • 技术债要量化：Bug 数、性能损耗、维护成本\n\n2. 分类\n   • 紧急且重要：影响核心功能，立即还\n   • 重要不紧急：规划进迭代，还债比例固定\n   • 紧急不重要：尽量避免，不要救火变成常态\n   • 不重要不紧急：不做\n\n3. 规划\n   • 每个 Sprint 留 10-20% 时间还债\n   • 大型重构要单独立项，评估 ROI\n   • 日常开发中顺带还债：重构 + 新功能一起\n\n4. 预防\n   • 新代码质量把控：Code Review、自动化测试\n   • 不要为了赶进度故意留债\n   • 明确技术债的 owner\n\n5. 沟通\n   • 向管理层说明技术债的风险\n   • 技术债汇报要量化：每周多少 Bug 由此产生\n   • 争取还债时间\n\n典型问题：\n• 欠了3年的债，一次性还完？不现实，分批还\n• 业务方不认可技术债价值 → 用数据说话",
+        "followUp": [
+          {
+            "question": "你们团队有还技术债的机制吗？",
+            "answer": "这个问题考察的是怎么平衡技术债和业务进度？相关的深度理解。是的，这是正确的理解。这个机制在生产环境中广泛应用，能够有效解决对应的技术问题。但需要注意具体实现的细节和边界条件，确保在所有场景下都能正常工作。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "有没有因为技术债踩过坑？",
+            "answer": "这个问题考察的是怎么平衡技术债和业务进度？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "重构的 ROI 怎么评估？",
+            "answer": "这个问题考察的是怎么平衡技术债和业务进度？相关的深度理解。根据实际业务场景和性能要求选择方案。需要考虑：1）数据规模和增长预期；2）延迟要求；3）可用性需求；4）运维复杂度。风控系统的经验是先保证数据不丢失，在此基础上优化性能。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch14_q1",
+      "chapterId": "ch14",
+      "number": 1,
+      "title": "你最近在学什么新技术？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "近期关注方向：\n\n1. AI/大模型应用\n   • RAG、Agent、Function Calling\n   • 向量数据库（Milvus/Pinecone）\n   • Prompt 工程实践\n\n2. 云原生\n   • Kubernetes 深入（网络、存储）\n   • 服务网格（Istio）\n   • Observability（AIOps）\n\n3. 性能优化\n   • 性能剖析工具（async-profiler、Arthas）\n   • JVM 调优实战\n   • 数据库调优\n\n4. 新兴语言/框架\n   • Rust（系统编程）\n   • Go（云原生、并发）\n   • AI 辅助编程（Copilot）\n\n学习方式：\n• 官方文档 + 源码\n• 实践项目（小 demo）\n• 技术博客（Medium、HackerNews）\n• 社区分享",
+        "followUp": [
+          {
+            "question": "学的这些在项目中有应用吗？",
+            "answer": "这个问题考察的是你最近在学什么新技术？相关的深度理解。项目中使用BlockingQueue实现简单的生产消费模式。如果需要更高性能，会选择Disruptor；如果需要更复杂的功能（如延迟消息），会使用RocketMQ或Kafka。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          },
+          {
+            "question": "怎么保持技术更新的？",
+            "answer": "保持技术更新的方法：1）每天花30分钟阅读技术文章，如HackerNews、掘金、知乎等平台；2）参与开源项目或自己写技术博客，通过输出倒逼输入；3）关注行业技术大会和分享，如QCon、ArchSummit；4）把新技术应用到实际项目中验证，而非纸上谈兵；5）和同行交流，了解业界动态。核心是保持好奇心和学习的主动性，形成自己的知识体系。"
+          },
+          {
+            "question": "AI 辅助编程对效率提升有多大？",
+            "answer": "这个问题考察的是你最近在学什么新技术？相关的深度理解。这是面试中的高频追问，考察对技术原理的深入理解。回答时要结合实际项目经验，说明在生产环境中是如何应用这项技术的，以及遇到过哪些问题和解决方案。实际项目中需要结合业务场景灵活应用。建议从以下几个角度深入：1）理解原理后再实践；2）关注实际生产环境中的表现；3）遇到问题要有排查思路；4）持续优化和总结。核心是既要知其然也要知其所以然，才能在面试中展示深度，在工作中解决实际问题。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch14_q2",
+      "chapterId": "ch14",
+      "number": 2,
+      "title": "你觉得你最大的技术亮点是什么？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "回答思路：\n\n选一个深入参与、有完整理解的项目/系统：\n• 不是参加了就行，是从 0 到 1 主导或核心参与\n• 最好有量化成果（性能提升 X 倍、成本降低 Y%）\n\n结构化回答：\n\n1. 背景：业务痛点和挑战\n2. 方案：技术选型和设计\n3. 难点：解决了什么技术难题\n4. 结果：量化成果\n5. 沉淀：总结和推广\n\n示例：\n「我主导设计了风控系统的实时特征平台，从日均千万量级扩展到日均十亿级别（P99 延迟从 200ms 降到 30ms）。\n\n主要工作：\n1. 设计了两级缓存架构（本地 Caffeine + Redis）\n2. 引入 Flink 实现特征实时计算\n3. 解决了特征一致性问题（Lambda 架构）\n4. 性能优化手段：并行化、预计算、热点识别\n\n沉淀：\n• 输出了特征平台设计规范\n• 在团队内做技术分享\n• 该方案推广到其他业务线」",
+        "followUp": [
+          {
+            "question": "有没有遇到过技术难点无法攻克的情况？",
+            "answer": "技术难点无法攻克的处理经验：1）先穷尽所有可行方案，包括查阅官方文档、社区帖子、请教专家；2）如果确实无法解决，评估影响范围，寻找绕过方案或妥协方案；3）及时向上级同步进度和风险，请求资源支持或调整deadline；4) 将问题记录下来并标注原因，供后续参考和复盘。关键是不要一个人硬扛，及时沟通和寻求帮助。"
+          },
+          {
+            "question": "亮点太技术化了，业务价值怎么体现？",
+            "answer": "技术亮点体现业务价值的方法：1）量化成果，P99延迟降低50%、成本降低30%、QPS提升5倍等；2）说明解决的问题，如支撑XX业务从零到一、支撑大促活动平稳度过；3）强调团队价值，方案推广到其他团队、输出技术规范；4）展示技术深度，不仅知道怎么用，还理解为什么。面试时用STAR法则描述，先说背景和挑战，再讲方案和落地，最后量化成果。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch14_q3",
+      "chapterId": "ch14",
+      "number": 3,
+      "title": "你对下一份工作最看重什么？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "几个维度（按优先级排序）：\n\n1. 技术成长\n   • 技术挑战：复杂业务问题、大规模系统\n   • 学习机会：技术大牛带、团队分享\n   • 技术方向：和我的规划一致\n\n2. 业务前景\n   • 行业：赛道是否有发展空间\n   • 产品：产品竞争力如何\n   • 数据量：系统复杂度够不够\n\n3. 团队氛围\n   • 团队规模：不是越大越好，中等规模（10-20人）最优\n   • 团队文化：技术驱动 vs 业务驱动\n   • 直属领导：是否值得跟\n\n4. 薪酬福利\n   • Base + 奖金 + 期权\n   • 福利：保险、补贴、假期\n   • 涨薪机制\n\n5. 地点/远程\n   • 通勤时间\n   • 远程政策\n   • 办公室环境\n\n不建议排序：按个人当前阶段决定优先级\n• 早期阶段 → 成长 > 薪资\n• 中期阶段 → 稳定 + 成长\n• 后期阶段 → 影响力 + 回报",
+        "followUp": [
+          {
+            "question": "你对加班怎么看？",
+            "answer": "对加班的看法：1）项目紧急时接受加班，这是职责和担当，项目成功大家都有成就感；2）长期高强度加班不可持续，效率会下降，身体也会出问题；3）如果是流程问题（如无效会议、重复劳动）导致加班，应推动流程优化而非默默忍受；4）平衡工作和生活，保持长期战斗力才是真正的职业素养。面试时表明态度但不极端，表达愿意付出但也要有底线。"
+          },
+          {
+            "question": "如果薪资和成长冲突你怎么选？",
+            "answer": "薪资和成长冲突时的选择：1）早期阶段（毕业3年内）优先成长，能学到东西最重要，薪资差距可以接受；2）中后期阶段（5年以上）平衡两者，既要成长也要合理回报，因为此时可能有家庭等压力；3）评估公司发展前景，股票期权等长期价值可能比短期薪资更重要；4）没有标准答案，根据当前阶段和需求决定，关键是想清楚自己要什么。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch14_q4",
+      "chapterId": "ch14",
+      "number": 4,
+      "title": "如果加入我们，你的前3个月计划是什么？",
+      "difficulty": "basic",
+      "labels": [],
+      "answer": {
+        "content": "三个月计划：\n\n**Month 1：熟悉环境**\n• 业务熟悉：产品、用户、核心流程\n• 技术熟悉：代码架构、技术栈、部署方式\n• 团队熟悉：成员分工、协作流程、沟通方式\n• 产出：技术文档补全、代码走读\n\n**Month 2：找切入点**\n• 参与项目：从小需求开始，边做边学\n• 找人聊：和 PM、测试、运维、前后端都聊一遍\n• 找问题：观察系统中可以改进的点\n• 产出：完成 1-2 个小需求，提出改进建议\n\n**Month 3：交付成果**\n• 独立负责一个子模块/项目\n• 和团队融合：参与技术方案讨论、Code Review\n• 交付第一个成果，建立信任\n• 产出：第一个独立负责的功能上线\n\n注意事项：\n• 不要一上来就大改系统\n• 先观察再行动\n• 多问问题，不懂就问\n• 尊重现有团队的技术决策",
+        "followUp": [
+          {
+            "question": "入职第一天你会做什么？",
+            "answer": "入职第一天：1）领取工位、电脑、账号权限，搭建开发环境；2）熟悉团队成员和沟通渠道，了解协作流程；3）了解项目代码结构和开发环境，阅读新人文档；4）阅读技术规范和架构设计文档；5）找导师或leader对齐试用期目标。核心是快速融入团队，不要急于上手写代码，先把环境和流程搞清楚。"
+          },
+          {
+            "question": "如果第一个月发现很多问题你会怎么办？",
+            "answer": "第一个月发现问题的处理方式：1）先观察和了解背景，不要急于下结论，很多问题有历史原因；2）找老员工聊聊，了解问题的来龙去脉；3）小问题私下沟通，大问题整理成文档和leader讨论；4）不要一上来就大改，尊重现有团队的技术决策，可以提建议但最终决策权在团队；5）先融入再影响，用实际成果证明自己再推动改变。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q1",
+      "chapterId": "ch15",
+      "number": 1,
+      "title": "CRM系统的核心模块有哪些？权限体系怎么设计？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解",
+        "设计能力"
+      ],
+      "answer": {
+        "content": "CRM系统核心模块：1）客户信息管理（客户档案、联系人、跟进记录）。2）销售管理（商机、报价、订单、合同）。3）营销自动化（线索获取、培育、转化）。4）服务管理（工单、满意度调查）。5）数据分析（销售漏斗、业绩报表）。\n\n权限体系设计：1）RBAC模型（角色-权限-用户），角色包含功能权限和数据权限。2）功能权限：菜单、按钮、字段的可见和操作权限。3）数据权限：基于组织架构（部门、团队）和数据范围的行级权限。4）静态权限（预分配）和动态权限（运行时计算）结合。5）SaaS多租户：租户隔离 + 租户内权限控制。",
+        "followUp": [
+          {
+            "question": "工作流引擎是怎么设计的？审批流怎么实现？",
+            "answer": "工作流引擎核心设计：1）流程定义用BPMN或JSON描述节点、连线、条件分支。2）实现方式：自研状态机（订单状态流转）或开源Flowable/Activiti（支持BPMN规范）。3）审批流实现：流程实例管理当前环节，任务分配给审批人，记录历史审批轨迹，支持会签、或签、加签、减签、转审等复杂逻辑。"
+          },
+          {
+            "question": "你们CRM的权限体系是怎么实现的？SaaS多租户权限怎么隔离？",
+            "answer": "权限体系实现：采用RBAC模型，用户绑定角色，角色绑定菜单/按钮/字段权限，数据权限通过AOP在SQL层注入tenant_id或org_id条件。SaaS多租户隔离：应用层做租户中间件透传tenantId，查询时统一加租户条件过滤，租户间数据操作在网关层直接拒绝。"
+          },
+          {
+            "question": "CRM系统的高并发场景有哪些？怎么处理的？",
+            "answer": "CRM高并发场景：1）批量导入/导出（几千上万条记录）；2）营销活动推送；3）数据统计报表。处理方案：1）批量操作异步化，消息队列削峰；2）分页查询避免全表锁；3）缓存热点数据（Redis）；4）读写分离；5）历史数据归档减少主库压力。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q2",
+      "chapterId": "ch15",
+      "number": 2,
+      "title": "工作流引擎的核心概念？审批流怎么实现？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "工作流核心概念：1）流程定义（Process Definition）：用BPMN或JSON描述流程节点、连线、条件分支。2）流程实例（Process Instance）：一次具体的审批流程。3）任务（Task）：当前需要处理的具体环节。4）历史记录（History）：审批轨迹。\n\n审批流实现方案：1）自研：用状态机（State Machine）实现，订单状态流转（待审核→审核中→已通过/已拒绝），状态变更记录审计日志。2）开源：Flowable、Activiti（支持BPMN规范），提供流程设计器、节点跳转、会签、或签。3）表达式引擎：流程条件分支用规则引擎判断。",
+        "followUp": [
+          {
+            "question": "动态审批人怎么实现？加签、减签、转审？",
+            "answer": "动态审批人实现：1）加签：创建并行任务，额外分配审批人；2）减签：取消未处理的并行任务；3）转审：将任务 assignee 改为新审批人，原审批人任务关闭。所有操作记录审计日志，支持流程回溯。技术实现：在任务表增加 parent_task_id 和 delegate_info 字段。"
+          },
+          {
+            "question": "审批超时怎么处理？定时任务还是消息驱动？",
+            "answer": "审批超时处理：1）定时任务轮询（XXL-JOB）：每分钟扫描待审批任务，超时则发送催办通知或自动通过/拒绝。2）消息驱动：任务创建时发送延迟消息（如24小时），超时未处理则触发回调。两种方案对比：定时任务简单但有延迟，消息驱动更实时但实现复杂。"
+          },
+          {
+            "question": "微服务架构下工作流怎么设计？流程状态怎么一致性？",
+            "answer": "微服务工作流设计：1）工作流服务作为独立微服务，流程状态存储在自身数据库。2）订单/工单等业务表只存储流程实例ID，不存储复杂状态。3）状态一致性：通过消息最终一致性，业务操作后发送事件触发工作流状态变更；补偿机制处理失败场景。4）Saga模式处理跨服务状态流转。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q3",
+      "chapterId": "ch15",
+      "number": 3,
+      "title": "SaaS多租户架构怎么设计？数据怎么隔离？",
+      "difficulty": "advanced",
+      "labels": [
+        "设计能力",
+        "深入理解"
+      ],
+      "answer": {
+        "content": "SaaS多租户隔离方案：1）独立数据库：每个租户独立数据库实例，隔离最彻底但成本高，适合金融、医疗等高安全要求。2）共享数据库+独立Schema：租户共享实例但有独立Schema，用pg_namespace或MySQL的database隔离。3）共享数据库+共享Schema：所有租户共用同一张表，用tenant_id区分，成本最低但隔离性差，需要做好数据权限兜底。\n\n数据权限兜底：在查询层面统一加tenant_id过滤，用AOP拦截所有DAO方法自动注入租户条件。应用层做租户隔离中间件，RPC调用时透传tenantId。跨租户数据操作在网关层直接拒绝。",
+        "followUp": [
+          {
+            "question": "租户间数据隔离用的是哪种方案？为什么？",
+            "answer": "根据业务场景选择：金融/医疗选独立数据库（最高隔离级别）；普通企业应用选共享数据库+独立Schema（平衡成本和安全）；内部系统可共用Schema（成本最低）。实际选择依据：1）数据安全合规要求；2）租户数量规模（百级以下可用Schema，千级以上建议独立数据库）；3）成本预算。"
+          },
+          {
+            "question": "租户扩容时数据迁移怎么做的？",
+            "answer": "租户扩容迁移流程：1）评估新方案（独立DB/独立Schema）；2）准备目标环境；3）使用ETL工具迁移数据（DataX/Sqoop）；4）迁移过程停服或只读；5）切换路由（修改租户配置表）；6）验证数据完整性；7）灰度切回。迁移策略：历史数据冷存储，新数据在新环境写入。"
+          },
+          {
+            "question": "SaaS定制化怎么实现？租户个性化配置存哪？",
+            "answer": "SaaS定制化实现：1）字段定制：启用/禁用某些字段，字段配置存租户配置表（tenant_config）；2）页面定制：租户有自己的页面模板配置；3）流程定制：租户可配置自己的审批流程。存储方案：租户配置存独立表（tenant_id + config_key + config_value），Redis缓存热点配置。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q4",
+      "chapterId": "ch15",
+      "number": 4,
+      "title": "AI推荐引擎在CRM里怎么用的？有哪些推荐策略？",
+      "difficulty": "advanced",
+      "labels": [
+        "高频追问",
+        "深入理解"
+      ],
+      "answer": {
+        "content": "CRM中AI推荐的应用场景：1）线索评分：基于历史转化数据训练模型，预测新线索转化概率，优先跟进高评分线索。2）相似客户推荐：根据当前客户特征推荐相似客户，挖掘潜在商机。3）产品推荐：基于客户画像推荐合适产品。4）流失预警：识别即将流失的客户特征，提前干预。\n\n推荐策略：1）协同过滤（User-Based / Item-Based）：找相似用户或相似商品。2）内容推荐：根据客户特征和商品特征的匹配度。3）深度学习：DIN、DIEN等序列模型捕捉用户行为序列。4）实时推荐：Flink流式计算实时特征，秒级更新推荐结果。",
+        "followUp": [
+          {
+            "question": "推荐模型怎么评估效果？有哪些指标？",
+            "answer": "推荐模型评估指标：1）离线指标：AUC、Precision@K、Recall@K、NDCG；2）在线指标：CTR（点击率）、CVR（转化率）、GMV提升。AB测试验证：分流量实验组和对照组，对比核心业务指标。模型迭代：根据业务目标选择指标，持续优化。"
+          },
+          {
+            "question": "冷启动问题怎么解决？",
+            "answer": "冷启动解决方案：1）用户冷启动：新用户用热门商品/通用规则，推荐系统用Popluar类容错；2）商品冷启动：利用商品内容特征（类目、品牌、价格）做内容相似推荐；3）系统冷启动：引入先验知识（行业通用规则），小样本学习（Meta Learning）快速收敛。"
+          },
+          {
+            "question": "实时推荐和离线推荐的架构有什么区别？",
+            "answer": "实时推荐架构：用户行为 → Kafka → Flink实时计算 → 特征存储（Redis）→ 在线召回排序 → 推荐结果。离线推荐架构：用户行为日志 → Hive/Spark离线处理 → 特征仓库 → 模型训练 → 批量推理 → 结果存入HBase。实时推荐延迟毫秒级，离线推荐小时级/天级。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q5",
+      "chapterId": "ch15",
+      "number": 5,
+      "title": "智能客服在CRM里怎么做的？对话管理怎么设计？",
+      "difficulty": "advanced",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "智能客服在CRM的应用：1）售前咨询：解答产品问题、推荐解决方案。2）售后支持：查询订单、处理投诉。3）主动触达：满意度回访、到期提醒。\n\n对话管理设计：1）意图识别：用NLU模型识别用户意图（查订单、投诉、退款等）。2）对话状态跟踪（Dialog State Tracking）：维护当前对话上下文。3）槽位填充：从对话中提取关键信息（订单号、时间、金额）。4）策略选择：基于状态选择下一步动作（回复、转人工、查询系统）。5）知识库检索：RAG从CRM知识库中检索答案。",
+        "followUp": [
+          {
+            "question": "多轮对话怎么实现的？对话上下文怎么管理？",
+            "answer": "多轮对话实现：1）上下文存储在Redis，key为session_id，value为对话历史（含意图、槽位、上一轮结果）；2）对话状态机管理流转（寒暄→业务查询→确认→完成）；3）每轮对话根据当前状态和用户输入更新状态，选择响应动作。多轮对话设计需考虑：对话中断恢复、上下文长度限制、状态机复杂度控制。"
+          },
+          {
+            "question": "对话失败转人工怎么做的？人工客服怎么接管？",
+            "answer": "转人工机制：1）触发条件：用户明确要求转人工/连续3次无法理解意图/涉及敏感操作。2）转接流程：机器人挂起，分配空闲人工客服，工单流转，CRM弹屏展示用户画像和对话历史。3）人工接管：客服工作台加载历史对话，上下文无缝衔接，支持回复用户或代客操作（如退款）。"
+          },
+          {
+            "question": "客服机器人怎么训练和维护？",
+            "answer": "机器人训练维护：1）语料收集：从真实客服对话中标注数据；2）意图分类：标注至少50条/意图的训练数据，用BERT等模型微调；3）知识库：运营人员维护FAQ，RAG检索增强；4）效果监控：准确率、意图识别率、转人工率；5）持续迭代：定期分析转人工case，更新模型和新意图。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q6",
+      "chapterId": "ch15",
+      "number": 6,
+      "title": "BI报表在CRM里怎么做的？有哪些核心指标？",
+      "difficulty": "intermediate",
+      "labels": [
+        "高频追问"
+      ],
+      "answer": {
+        "content": "CRM BI报表核心指标：1）销售指标：销售额、回款额、新增客户数、商机转化率。2）客户指标：客户流失率、客户满意度、复购率。3）团队指标：销售人均产能、拜访完成率。4）运营指标：响应时效、问题解决率。\n\n技术实现：1）数据层：CRM业务库 → ETL → 数据仓库（星型模型）。2）报表层：Superset、Tableau等BI工具连接数据仓库。3）实时报表：用Flink实时聚合，ES存储，Kibana展示。4）中国式报表：用帆软FineReport，支持复杂表头、合并单元格。",
+        "followUp": [
+          {
+            "question": "数据仓库怎么设计的？事实表和维度表？",
+            "answer": "数据仓库设计：1）事实表：销售订单事实表（订单ID、客户ID、时间ID、产品ID、销售额、数量），业务过程度量；2）维度表：客户维度（客户ID、名称、行业、规模）、产品维度（产品ID、名称、类目）、时间维度（日期ID、年季月周日）。3）星型模型：事实表居中，维度表围绕，简化关联查询。"
+          },
+          {
+            "question": "实时报表和离线报表的区别？技术栈分别是什么？",
+            "answer": "实时报表：Flink消费Kafka数据，实时聚合写入ES/Redis，前端轮询或WebSocket推送，适用于监控大屏。离线报表：每日凌晨ETL跑批，数据入Hive/StarRocks，定时邮件发送，适用于经营分析。技术栈选择根据业务时效性要求和数据量级。"
+          },
+          {
+            "question": "数据异常波动怎么排查？",
+            "answer": "数据异常排查：1）确认数据源是否有变化（ETL任务失败/数据延迟）；2）拆解指标口径，对比分子分母；3）按维度拆解（地区、产品线、时间段）定位异常点；4）检查是否存在脏数据（异常值、null值）；5）联系业务方确认是否有业务策略变化。常用工具：SQL临时查询、Superset穿透分析、数据对比（今日vs昨日/上周同期）。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q7",
+      "chapterId": "ch15",
+      "number": 7,
+      "title": "Docker镜像怎么构建优化？有哪些最佳实践？",
+      "difficulty": "basic",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "Docker镜像优化：1）多阶段构建：用maven构建jar，最后用精简JRE镜像运行，减少镜像体积。2）减少层数：合并RUN指令，清理中间文件。3）利用缓存：把不常变化的指令（如依赖下载）放前面，变化频繁的放后面。4）不安装额外工具：最小化基础镜像（如alpine），不装vim、curl等。5）.dockerignore排除不需要的文件。\n\n示例Dockerfile：\nFROM maven:3.8-openjdk-17 AS builder\nWORKDIR /app\nCOPY pom.xml .\nRUN mvn dependency:go-offline\nCOPY src ./src\nRUN mvn package -DskipTests\n\nFROM eclipse-temurin:17-jre-alpine\nWORKDIR /app\nCOPY --from=builder /app/target/*.jar app.jar\nENTRYPOINT [\"java\", \"-jar\", \"app.jar\"]",
+        "followUp": [
+          {
+            "question": "镜像体积怎么优化？从1GB降到100MB怎么做的？",
+            "answer": "镜像优化实践：1）多阶段构建分离构建和运行环境；2）使用 alpine 精简系统替代 ubuntu；3）只复制必要文件（target/*.jar）而非整个构建产物；4）清理缓存（mvn clean，npm cache prune）；5）使用 distroless 或 jre-alpine 替代完整 JDK。实战：从1GB优化到100MB的关键是删除所有构建工具和系统多余组件。"
+          },
+          {
+            "question": "容器启动失败怎么排查？",
+            "answer": "容器启动失败排查：1）docker logs <container> 查看启动日志；2）docker inspect <container> 查看退出码和配置；3）docker run -it <image> /bin/sh 手动进入容器调试；4）检查Entrypoint/CMD是否阻塞；5）检查依赖服务是否就绪；6）检查健康检查逻辑。常见问题：端口占用、文件权限、环境变量缺失。"
+          },
+          {
+            "question": "Docker-Compose和K8S的区别？什么时候用哪个？",
+            "answer": "Docker-Compose：本地开发/单机器部署，定义多个容器及其依赖，适合快速启动本地环境。K8S：生产级容器编排，支持多节点集群、滚动更新、自动扩缩容、服务发现、负载均衡。企业生产环境用K8S，开发测试用Compose。小项目用Compose简化运维，大型分布式系统用K8S统一管理。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q8",
+      "chapterId": "ch15",
+      "number": 8,
+      "title": "Kubernetes的核心概念？Pod、Deployment、Service、Ingress？",
+      "difficulty": "intermediate",
+      "labels": [
+        "必须掌握"
+      ],
+      "answer": {
+        "content": "K8S核心概念：1）Pod：最小调度单元，一个Pod包含一个或多个容器，共享网络和存储。2）Deployment：管理Pod副本数、滚动更新、回滚。3）Service：服务发现和负载均衡，给Pod提供固定IP和DNS。4）Ingress：HTTP/HTTPS路由，外部流量入口。5）ConfigMap/Secret：配置和敏感信息管理。6）PV/PVC：持久化存储。\n\n核心机制：1）kube-proxy维护Service endpoints，实现负载均衡。2）kubelet定期汇报节点和Pod状态。3）Scheduler根据资源需求调度Pod到合适节点。4）Controller Manager维护期望状态（副本数、滚动策略）。",
+        "followUp": [
+          {
+            "question": "Pod调度策略有哪些？亲和性、反亲和性怎么用？",
+            "answer": "Pod调度策略：1）NodeSelector：标签匹配指定节点；2）NodeAffinity：节点亲和性（软硬规则）；3）PodAffinity/PodAntiAffinity：Pod间亲和/反亲和（让相关Pod在同一区域或分开）；4）Taints和Tolerations：污点和容忍（某些节点专用于特定Pod）。实战：数据库Pod用反亲和性分散到不同节点，避免单点故障。"
+          },
+          {
+            "question": "K8S服务发现怎么做的？Service DNS和CoreDNS？",
+            "answer": "K8S服务发现：1）Service DNS：cluster-ip:port 或 <service-name>.<namespace>.svc.cluster.local 全限定名；2）CoreDNS：集群内DNS服务器，解析Service名称为ClusterIP；3）环境变量：kubelet为每个Pod注入所有Service的环境变量（不推荐，已过时）。应用获取目标地址：优先使用DNS，DNS不可用时才用环境变量。"
+          },
+          {
+            "question": "滚动更新和回滚怎么实现的？",
+            "answer": "滚动更新：Deployment控制器逐步替换旧Pod为新Pod，可通过 maxSurge 和 maxUnavailable 控制更新节奏。回滚：kubectl rollout undo deployment/<name> 回退到上一版本，kubectl rollout history 查看版本历史，kubectl rollout undo --to-revision=<n> 回退到指定版本。滚动更新保证服务持续可用，回滚保证出问题快速恢复。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q9",
+      "chapterId": "ch15",
+      "number": 9,
+      "title": "CI/CD流水线怎么设计？有哪些关键环节？",
+      "difficulty": "intermediate",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "CI/CD关键环节：1）代码提交：Git触发WebHook启动流水线。2）编译构建：Maven/Gradle构建，单元测试。3）代码扫描：SonarQube做静态分析（代码规范、安全漏洞、重复度）。4）镜像构建：Docker build + tag（commit SHA）。5）安全扫描：Trivy扫描镜像漏洞。6）制品库：Harbor存储镜像。7）部署：Helm部署到K8S环境。8）自动化测试：集成测试、端到端测试。9）通知：钉钉/Slack通知结果。\n\n工具链：GitLab CI / Jenkins / ArgoCD + Harbor + SonarQube + Trivy + Argo Rollouts（渐进式发布）。",
+        "followUp": [
+          {
+            "question": "GitOps怎么做的？ArgoCD怎么配置？",
+            "answer": "GitOps核心：Git仓库存储声明式基础设施和应用配置，自动化同步到集群。ArgoCD配置：1）Application CRD定义应用（Git仓库地址、目标集群、路径）；2）ArgoCD监控Git仓库变更，自动部署到K8S；3）Sync Policy配置自动或手动同步。优势：配置版本化、审计追溯、环境一致性。"
+          },
+          {
+            "question": "蓝绿部署和金丝雀发布有什么区别？",
+            "answer": "蓝绿部署：两套完整环境，新版本完全部署到绿色环境，验证通过后切换流量（负载均衡切IP），回滚只需切回蓝色环境。金丝雀发布：只将小比例流量（如5%）切换到新版本，逐步扩大，监控指标稳定后全量发布。蓝绿适合大版本发布需要全量验证场景，金丝雀适合风险较高需要小范围验证场景。"
+          },
+          {
+            "question": "流水线构建失败怎么排查？",
+            "answer": "流水线失败排查：1）查看流水线日志，定位失败步骤（构建/测试/扫描/部署）；2）常见失败原因：依赖下载失败（检查私有仓库配置）、测试用例失败（查看测试报告）、镜像构建失败（检查Dockerfile）、部署失败（检查K8S配置和资源）。3）日志保留：失败后保留构建产物方便调试；4）告警通知：失败时及时通知负责人。"
+          }
+        ]
+      }
+    },
+    {
+      "id": "ch15_q10",
+      "chapterId": "ch15",
+      "number": 10,
+      "title": "Vue和React在前端协作时，后端Java需要知道什么？",
+      "difficulty": "basic",
+      "labels": [
+        "深入理解"
+      ],
+      "answer": {
+        "content": "后端Java需要了解：1）跨域问题：CORS配置，后端SpringBoot加@CrossOrigin或WebMvcConfigurer配置允许的域名。2）鉴权方式：JWT Token在Header中传递（Authorization: Bearer xxx），Token刷新机制。3）组件状态：Vue的ref/reactive，React的useState/useReducer，后端需要支持幂等操作。4）接口设计：RESTful风格，GET/POST/PUT/DELETE语义清晰，分页参数（page, size），排序（sortby, order）。5）错误处理：统一的错误响应结构（code, message, data），HTTP状态码4xx/5xx含义。6）WebSocket：前后端全双工通信，用于实时通知。",
+        "followUp": [
+          {
+            "question": "前端频繁请求接口怎么优化？后端需要做什么缓存？",
+            "answer": "前后端优化方案：1）前端节流防抖，相同请求缓存；2）后端Redis缓存热点数据（用户信息、配置），设置TTL；3）接口合并（GraphQL/BFF层）；4）CDN缓存静态资源；5）HTTP缓存（Last-Modified/ETag）；6）数据预加载。缓存策略根据数据实时性要求选择。"
+          },
+          {
+            "question": "SSE和WebSocket的区别？各自适用场景？",
+            "answer": "SSE（Server-Sent Events）：基于HTTP单工通道，服务器推送数据到浏览器，适合服务端推送到浏览器（如通知、实时数据），实现简单，浏览器原生支持，兼容性更好。WebSocket：基于TCP双工通道，浏览器和服务端可双向通信，适合聊天、协作、游戏等需要双向实时通信场景。选型：单向推送选SSE，双向通信选WebSocket。"
+          },
+          {
+            "question": "前后端接口版本怎么管理？",
+            "answer": "接口版本管理：1）URL路径版本：/api/v1/users、/api/v2/users；2）Header版本：Accept: application/vnd.api+json, version=2；3）Query参数版本：/api/users?version=2。推荐URL路径版本，版本切换直观，便于路由和网关配置。版本策略：保持旧版本兼容一段时间（通常6-12个月），逐步下线旧版本。"
+          }
+        ]
+      }
+    }
+  ]
+}
