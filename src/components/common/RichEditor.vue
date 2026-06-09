@@ -1,5 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, nextTick } from 'vue'
+import { ref, watch, onMounted } from 'vue'
+import { sanitizeHtml } from '@/services/htmlSanitizer'
 
 const props = defineProps<{
   modelValue: string
@@ -19,23 +20,29 @@ const savedSelection = ref<Range | null>(null)
 // Sync incoming model value → DOM (only when not focused to avoid cursor jumps)
 watch(() => props.modelValue, (val) => {
   if (!editorRef.value || isFocused.value) return
-  if (editorRef.value.innerHTML !== val) {
-    editorRef.value.innerHTML = val || ''
+  const sanitized = sanitizeHtml(val || '')
+  if (editorRef.value.innerHTML !== sanitized) {
+    editorRef.value.innerHTML = sanitized
   }
-  showPlaceholder.value = !val
+  showPlaceholder.value = !sanitized
 })
 
 onMounted(() => {
   if (editorRef.value) {
-    editorRef.value.innerHTML = props.modelValue || ''
-    showPlaceholder.value = !props.modelValue
+    const sanitized = sanitizeHtml(props.modelValue || '')
+    editorRef.value.innerHTML = sanitized
+    showPlaceholder.value = !sanitized
   }
 })
 
 function onInput() {
   const html = editorRef.value?.innerHTML ?? ''
   // Treat empty div as empty string
-  const clean = html === '<br>' || html === '<div><br></div>' ? '' : html
+  const sanitized = sanitizeHtml(html)
+  if (editorRef.value && editorRef.value.innerHTML !== sanitized) {
+    editorRef.value.innerHTML = sanitized
+  }
+  const clean = sanitized === '<br>' || sanitized === '<div><br></div>' ? '' : sanitized
   showPlaceholder.value = !clean
   emit('update:modelValue', clean)
 }
@@ -89,7 +96,7 @@ function setFontSize(e: Event) {
   fontEls?.forEach(el => {
     const span = document.createElement('span')
     span.style.fontSize = size
-    span.innerHTML = el.innerHTML
+    span.innerHTML = sanitizeHtml(el.innerHTML)
     el.parentNode?.replaceChild(span, el)
   })
   // Keep list item marker size in sync with content size.
@@ -103,7 +110,7 @@ function normalizeForegroundColor(color: string) {
   fontEls?.forEach(el => {
     const span = document.createElement('span')
     span.style.color = color
-    span.innerHTML = el.innerHTML
+    span.innerHTML = sanitizeHtml(el.innerHTML)
     el.parentNode?.replaceChild(span, el)
   })
 }

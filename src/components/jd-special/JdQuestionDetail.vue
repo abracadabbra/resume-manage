@@ -42,7 +42,7 @@ const difficultyLabel: Record<string, string> = {
       <div class="detail-content">
         <section class="answer-section">
           <h2 class="section-title">参考答案</h2>
-          <div class="answer-content" v-html="store.selectedQuestion.answer.content.replace(/\n/g, '<br>')"></div>
+          <div class="answer-content" v-safe-html="store.selectedQuestion.answer.content.replace(/\n/g, '<br>')"></div>
         </section>
 
         <section v-if="store.selectedQuestion.answer.followUp.length" class="followup-section">

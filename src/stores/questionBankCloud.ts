@@ -1,4 +1,9 @@
 import type { PracticeRecord, Question } from '@/stores/questionBank'
+import {
+  createSyncConflict,
+  decideSyncDecision,
+  type SyncConflict,
+} from './syncConflict'
 
 type ValueRef<T> = { value: T }
 
@@ -19,6 +24,7 @@ export interface QuestionBankCloudState {
   cloudSyncStatus: ValueRef<'idle' | 'pulling' | 'pushing'>
   cloudSyncError: ValueRef<string>
   cloudLastSyncedAt: ValueRef<number | null>
+  cloudConflict: ValueRef<SyncConflict | null>
 }
 
 export interface QuestionBankCloudApi {
@@ -47,6 +53,18 @@ function getErrorMessage(error: unknown, fallback: string): string {
   return fallback
 }
 
+function getCloudUpdatedAt(record: QuestionBankCloudRecord): number {
+  const dataUpdatedAt = record.data.updatedAt
+  if (typeof dataUpdatedAt === 'number' && Number.isFinite(dataUpdatedAt)) {
+    return dataUpdatedAt
+  }
+  return new Date(record.updated_at).getTime()
+}
+
+function setConflictError(state: QuestionBankCloudState) {
+  state.cloudSyncError.value = '检测到本地和云端都有更新，请先选择保留本地或使用云端，避免覆盖。'
+}
+
 export function createQuestionBankCloudManager(options: QuestionBankCloudManagerOptions) {
   const { api, state, getData, loadData } = options
 
@@ -54,9 +72,30 @@ export function createQuestionBankCloudManager(options: QuestionBankCloudManager
     const userId = requireUserId(userIdValue)
     state.cloudSyncStatus.value = 'pushing'
     state.cloudSyncError.value = ''
+    state.cloudConflict.value = null
 
     try {
-      const record = await api.upsertQuestionBankState(userId, getData())
+      const localData = getData()
+      const cloudRecord = await api.getQuestionBankState(userId)
+      if (cloudRecord) {
+        const cloudUpdatedAt = getCloudUpdatedAt(cloudRecord)
+        const decision = decideSyncDecision({
+          localUpdatedAt: localData.updatedAt,
+          cloudUpdatedAt,
+          lastSyncedAt: state.cloudLastSyncedAt.value,
+        })
+        if (decision === 'conflict') {
+          state.cloudConflict.value = createSyncConflict({
+            localUpdatedAt: localData.updatedAt,
+            cloudUpdatedAt,
+            lastSyncedAt: state.cloudLastSyncedAt.value,
+          })
+          setConflictError(state)
+          return cloudRecord
+        }
+      }
+
+      const record = await api.upsertQuestionBankState(userId, localData)
       state.cloudLastSyncedAt.value = new Date(record.updated_at).getTime()
       return record
     } catch (error) {
@@ -71,6 +110,7 @@ export function createQuestionBankCloudManager(options: QuestionBankCloudManager
     const userId = requireUserId(userIdValue)
     state.cloudSyncStatus.value = 'pulling'
     state.cloudSyncError.value = ''
+    state.cloudConflict.value = null
 
     try {
       const record = await api.getQuestionBankState(userId)
@@ -78,7 +118,29 @@ export function createQuestionBankCloudManager(options: QuestionBankCloudManager
         state.cloudLastSyncedAt.value = null
         return null
       }
-      loadData(record.data)
+      const localData = getData()
+      const cloudUpdatedAt = getCloudUpdatedAt(record)
+      const decision = state.cloudLastSyncedAt.value === null
+        ? 'use-cloud'
+        : decideSyncDecision({
+          localUpdatedAt: localData.updatedAt,
+          cloudUpdatedAt,
+          lastSyncedAt: state.cloudLastSyncedAt.value,
+        })
+
+      if (decision === 'conflict') {
+        state.cloudConflict.value = createSyncConflict({
+          localUpdatedAt: localData.updatedAt,
+          cloudUpdatedAt,
+          lastSyncedAt: state.cloudLastSyncedAt.value,
+        })
+        setConflictError(state)
+        return record
+      }
+
+      if (decision === 'use-cloud') {
+        loadData(record.data)
+      }
       state.cloudLastSyncedAt.value = new Date(record.updated_at).getTime()
       return record
     } catch (error) {
@@ -89,8 +151,53 @@ export function createQuestionBankCloudManager(options: QuestionBankCloudManager
     }
   }
 
+  async function resolveConflictWithCloud(userIdValue: string | null | undefined) {
+    const userId = requireUserId(userIdValue)
+    state.cloudSyncStatus.value = 'pulling'
+    state.cloudSyncError.value = ''
+
+    try {
+      const record = await api.getQuestionBankState(userId)
+      if (!record) {
+        state.cloudConflict.value = null
+        state.cloudLastSyncedAt.value = null
+        return null
+      }
+
+      loadData(record.data)
+      state.cloudConflict.value = null
+      state.cloudLastSyncedAt.value = new Date(record.updated_at).getTime()
+      return record
+    } catch (error) {
+      state.cloudSyncError.value = getErrorMessage(error, '使用云端题库失败')
+      throw error
+    } finally {
+      state.cloudSyncStatus.value = 'idle'
+    }
+  }
+
+  async function resolveConflictWithLocal(userIdValue: string | null | undefined) {
+    const userId = requireUserId(userIdValue)
+    state.cloudSyncStatus.value = 'pushing'
+    state.cloudSyncError.value = ''
+
+    try {
+      const record = await api.upsertQuestionBankState(userId, getData())
+      state.cloudConflict.value = null
+      state.cloudLastSyncedAt.value = new Date(record.updated_at).getTime()
+      return record
+    } catch (error) {
+      state.cloudSyncError.value = getErrorMessage(error, '保留本地题库失败')
+      throw error
+    } finally {
+      state.cloudSyncStatus.value = 'idle'
+    }
+  }
+
   return {
     pushToCloud,
     pullFromCloud,
+    resolveConflictWithCloud,
+    resolveConflictWithLocal,
   }
 }

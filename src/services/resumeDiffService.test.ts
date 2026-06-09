@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
 
 import { buildResumeDiff } from '@/services/resumeDiffService'
-import type { ResumeDraftData } from '@/stores/resumePersistence'
+import { RESUME_DRAFT_SCHEMA_VERSION, type ResumeDraftData } from '@/stores/resumePersistence'
 
 function createResumeData(overrides: Partial<ResumeDraftData> = {}): ResumeDraftData {
   return {
+    schemaVersion: RESUME_DRAFT_SCHEMA_VERSION,
     modules: [
       { key: 'basicInfo', label: '基本信息', icon: 'user', visible: true },
       { key: 'education', label: '教育经历', icon: 'education', visible: true },

@@ -60,6 +60,12 @@ const compareResult = computed(() => {
   return buildResumeDiff(compareLeftOption.value.data, compareRightOption.value.data)
 })
 
+const cloudConflictText = computed(() => {
+  const conflict = store.cloudConflict
+  if (!conflict) return ''
+  return `本地 ${formatTimestamp(conflict.localUpdatedAt)} / 云端 ${formatTimestamp(conflict.cloudUpdatedAt)} 均有更新`
+})
+
 watch(
   compareOptions,
   (options) => {
@@ -116,6 +122,17 @@ function formatDateTime(value: string | null | undefined): string {
   })
 }
 
+function formatTimestamp(value: number): string {
+  if (!Number.isFinite(value) || value <= 0) return '时间未知'
+
+  return new Date(value).toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
+}
+
 function getDiffKindLabel(kind: ResumeDiffKind): string {
   if (kind === 'added') return '新增'
   if (kind === 'removed') return '删除'
@@ -157,6 +174,32 @@ async function handleDeleteVersion(resumeId: string, event: Event) {
   await store.removeVersion(resumeId)
 }
 
+async function handleUseCloudVersion() {
+  error.value = ''
+  loading.value = true
+
+  try {
+    await store.resolveCloudConflictWithCloud()
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '使用云端失败'
+  } finally {
+    loading.value = false
+  }
+}
+
+async function handleKeepLocalVersion() {
+  error.value = ''
+  loading.value = true
+
+  try {
+    await store.resolveCloudConflictWithLocal('当前简历')
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '保留本地失败'
+  } finally {
+    loading.value = false
+  }
+}
+
 function openCompareWith(resumeId: string, event: Event) {
   event.stopPropagation()
   compareLeftId.value = resumeId
@@ -193,6 +236,21 @@ function openCompareWith(resumeId: string, event: Event) {
         >
           版本对比
         </button>
+      </div>
+
+      <div v-if="store.cloudConflict" class="conflict-banner">
+        <div>
+          <strong>检测到云同步冲突</strong>
+          <p>{{ cloudConflictText }}，请选择要保留的版本。</p>
+        </div>
+        <div class="conflict-actions">
+          <button type="button" class="secondary-btn" :disabled="loading" @click="handleUseCloudVersion">
+            使用云端
+          </button>
+          <button type="button" class="primary-btn" :disabled="loading" @click="handleKeepLocalVersion">
+            保留本地
+          </button>
+        </div>
       </div>
 
       <template v-if="viewMode === 'manage'">
@@ -472,6 +530,66 @@ function openCompareWith(resumeId: string, event: Event) {
 .view-switch-btn.active {
   background: #2d2521;
   color: #fff;
+}
+
+.conflict-banner {
+  margin-bottom: 16px;
+  padding: 12px;
+  border: 1px solid #e8c69e;
+  border-radius: 8px;
+  background: #fff8ee;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.conflict-banner strong {
+  display: block;
+  font-size: 13px;
+  color: #7c3f16;
+}
+
+.conflict-banner p {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #8a5a30;
+}
+
+.conflict-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.primary-btn,
+.secondary-btn {
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.primary-btn {
+  border: 1px solid #2a5caa;
+  background: #2a5caa;
+  color: #fff;
+}
+
+.secondary-btn {
+  border: 1px solid #d6c9b8;
+  background: #fff;
+  color: #6f5947;
+}
+
+.primary-btn:disabled,
+.secondary-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
 }
 
 .version-list {
@@ -838,6 +956,20 @@ function openCompareWith(resumeId: string, event: Event) {
 
   .target-arrow {
     display: none;
+  }
+
+  .conflict-banner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .conflict-actions {
+    width: 100%;
+  }
+
+  .primary-btn,
+  .secondary-btn {
+    flex: 1;
   }
 }
 </style>

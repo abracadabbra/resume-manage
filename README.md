@@ -138,7 +138,7 @@
 - 状态管理：Pinia
 - 类型系统：TypeScript + vue-tsc
 - 代码质量：ESLint + Oxlint + Oxfmt
-- 导出：html2canvas + jsPDF / html2pdf.js
+- 导出：html2canvas + jsPDF
 - Markdown 渲染：markdown-it
 
 ## 运行环境
@@ -150,10 +150,22 @@
 
 ```bash
 npm install
+cp .env.example .env
 npm run dev
 ```
 
 默认开发地址：`http://localhost:5173`
+
+### 环境变量
+
+云同步依赖 Supabase，请在 `.env` 中配置：
+
+```bash
+VITE_SUPABASE_URL=https://your-project.supabase.co
+VITE_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+未配置时，本地简历编辑、模板预览、导出和 AI 功能仍可使用；登录同步和题库云同步会提示缺少 Supabase 配置。
 
 ## Docker 一键部署
 

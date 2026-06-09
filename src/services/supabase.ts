@@ -1,10 +1,18 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 import type { QuestionBankCloudData, QuestionBankCloudRecord } from '@/stores/questionBankCloud'
 
-const supabaseUrl = 'https://plymffomjwgaisicytbl.supabase.co'
-const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBseW1mZm9tandnYWlzaWN5dGJsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU0NjY2MzYsImV4cCI6MjA5MTA0MjYzNn0.EhktPQqFanIbF6ButJpyczFmOvrwnO9xNvdBkp4WomA'
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
-export const supabase: SupabaseClient = createClient(supabaseUrl, supabaseAnonKey)
+let supabaseClient: SupabaseClient | null = null
+
+function getSupabaseClient(): SupabaseClient {
+  if (!supabaseUrl || !supabaseAnonKey) {
+    throw new Error('缺少 Supabase 配置，请设置 VITE_SUPABASE_URL 和 VITE_SUPABASE_ANON_KEY。')
+  }
+  supabaseClient ??= createClient(supabaseUrl, supabaseAnonKey)
+  return supabaseClient
+}
 
 export interface ResumeRecord {
   id: string
@@ -24,10 +32,10 @@ export interface UserProfile {
 }
 
 export async function signUp(email: string, password: string) {
-  const result = await supabase.auth.signUp({ email, password })
+  const result = await getSupabaseClient().auth.signUp({ email, password })
   
   if (result.data?.user) {
-    await supabase.from('profiles').upsert({
+    await getSupabaseClient().from('profiles').upsert({
       id: result.data.user.id,
       email: email,
     }, { onConflict: 'id' })
@@ -37,17 +45,17 @@ export async function signUp(email: string, password: string) {
 }
 
 export async function signIn(email: string, password: string) {
-  const result = await supabase.auth.signInWithPassword({ email, password })
+  const result = await getSupabaseClient().auth.signInWithPassword({ email, password })
   
   if (result.data?.user) {
-    const { data: existingProfile } = await supabase
+    const { data: existingProfile } = await getSupabaseClient()
       .from('profiles')
       .select('id')
       .eq('id', result.data.user.id)
       .single()
     
     if (!existingProfile) {
-      await supabase.from('profiles').insert({
+      await getSupabaseClient().from('profiles').insert({
         id: result.data.user.id,
         email: email,
       })
@@ -58,15 +66,15 @@ export async function signIn(email: string, password: string) {
 }
 
 export async function signOut() {
-  return supabase.auth.signOut()
+  return getSupabaseClient().auth.signOut()
 }
 
 export async function getSession() {
-  return supabase.auth.getSession()
+  return getSupabaseClient().auth.getSession()
 }
 
 export async function getResumes(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('resumes')
     .select('*')
     .eq('user_id', userId)
@@ -77,7 +85,7 @@ export async function getResumes(userId: string) {
 }
 
 export async function getActiveResume(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('resumes')
     .select('*')
     .eq('user_id', userId)
@@ -90,7 +98,7 @@ export async function getActiveResume(userId: string) {
 }
 
 export async function createResume(userId: string, name: string, data: unknown) {
-  const { data: existingResumes } = await supabase
+  const { data: existingResumes } = await getSupabaseClient()
     .from('resumes')
     .select('version')
     .eq('user_id', userId)
@@ -101,7 +109,7 @@ export async function createResume(userId: string, name: string, data: unknown) 
     ? (existingResumes[0].version || 0) + 1 
     : 1
 
-  const { data: resume, error } = await supabase
+  const { data: resume, error } = await getSupabaseClient()
     .from('resumes')
     .insert({
       user_id: userId,
@@ -118,7 +126,7 @@ export async function createResume(userId: string, name: string, data: unknown) 
 }
 
 export async function updateResume(id: string, data: unknown) {
-  const { data: resume, error } = await supabase
+  const { data: resume, error } = await getSupabaseClient()
     .from('resumes')
     .update({ data, updated_at: new Date().toISOString() })
     .eq('id', id)
@@ -130,12 +138,12 @@ export async function updateResume(id: string, data: unknown) {
 }
 
 export async function setActiveResume(userId: string, resumeId: string) {
-  await supabase
+  await getSupabaseClient()
     .from('resumes')
     .update({ is_active: false })
     .eq('user_id', userId)
   
-  const { error } = await supabase
+  const { error } = await getSupabaseClient()
     .from('resumes')
     .update({ is_active: true })
     .eq('id', resumeId)
@@ -144,7 +152,7 @@ export async function setActiveResume(userId: string, resumeId: string) {
 }
 
 export async function deleteResume(id: string) {
-  const { error } = await supabase
+  const { error } = await getSupabaseClient()
     .from('resumes')
     .delete()
     .eq('id', id)
@@ -153,7 +161,7 @@ export async function deleteResume(id: string) {
 }
 
 export async function getQuestionBankState(userId: string) {
-  const { data, error } = await supabase
+  const { data, error } = await getSupabaseClient()
     .from('question_bank_states')
     .select('*')
     .eq('user_id', userId)
@@ -165,7 +173,7 @@ export async function getQuestionBankState(userId: string) {
 }
 
 export async function upsertQuestionBankState(userId: string, data: QuestionBankCloudData) {
-  const { data: record, error } = await supabase
+  const { data: record, error } = await getSupabaseClient()
     .from('question_bank_states')
     .upsert(
       {

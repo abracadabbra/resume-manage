@@ -1,5 +1,6 @@
 import type { AiConfig } from '@/stores/aiConfig'
 import type { BasicInfo, EducationEntry, ProjectEntry, WorkEntry } from '@/stores/resume'
+import { streamChatCompletion } from '@/services/aiClient'
 import { candidateModeSystemPrompt } from '@/services/prompts/interviewCandidatePrompt'
 import { interviewerModeSystemPrompt } from '@/services/prompts/interviewInterviewerPrompt'
 
@@ -69,15 +70,6 @@ export interface InterviewTurnRequest {
 
 export interface InterviewTurnStreamCallbacks {
   onAssistantReplyChunk?: (text: string) => void
-}
-
-function normalizeApiUrl(raw: string): string {
-  let baseUrl = raw.trim().replace(/\/+$/, '')
-  if (!baseUrl.includes('/v1/chat/completions')) {
-    if (!baseUrl.endsWith('/v1')) baseUrl += '/v1'
-    baseUrl += '/chat/completions'
-  }
-  return baseUrl
 }
 
 function toPlainText(htmlOrText: string): string {
@@ -397,25 +389,11 @@ function dedupeMirroredContent(content: string): string {
   return text
 }
 
-function mergeMessageSnapshot(
-  fullContent: string,
-  messageContent: string
-): string {
-  if (!fullContent) return messageContent
-  if (messageContent === fullContent) return fullContent
-  if (messageContent.startsWith(fullContent)) return messageContent
-  if (messageContent.includes(fullContent)) return messageContent
-  if (fullContent.startsWith(messageContent)) return fullContent
-  if (fullContent.includes(messageContent)) return fullContent
-  return `${fullContent}${messageContent}`
-}
-
 export async function requestInterviewTurn(
   request: InterviewTurnRequest,
   signal?: AbortSignal,
   callbacks?: InterviewTurnStreamCallbacks
 ): Promise<InterviewTurnResponse> {
-  const endpoint = normalizeApiUrl(request.config.apiUrl)
   const systemPrompt =
     request.mode === 'candidate'
       ? candidateModeSystemPrompt()
@@ -428,107 +406,27 @@ export async function requestInterviewTurn(
     content: truncateText(item.content, 700),
   }))
 
-  const response = await fetch(endpoint, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${request.config.apiToken}`,
-    },
-    body: JSON.stringify({
-      model: request.config.modelName,
-      temperature: 0.5,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        ...historyMessages,
-        { role: 'user', content: userCommandPrompt },
-      ],
-      stream: true,
-    }),
-    signal,
-  })
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '')
-    throw new Error(`AI请求失败 (${response.status}): ${errorText || response.statusText}`)
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) {
-    const payload = (await response.json()) as {
-      choices?: Array<{ message?: { content?: string } }>
-    }
-    const content = payload.choices?.[0]?.message?.content?.trim() ?? ''
-    const normalized = normalizeTurnResponse(content)
-    callbacks?.onAssistantReplyChunk?.(normalized.assistantReply)
-    return normalized
-  }
-
-  const decoder = new TextDecoder()
-  let fullContent = ''
-  let sseBuffer = ''
   let lastAssistantReply = ''
-  let hasDeltaChunks = false
 
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    sseBuffer += decoder.decode(value, { stream: true })
-    const lines = sseBuffer.split('\n')
-    sseBuffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || !trimmed.startsWith('data:')) continue
-      const data = trimmed.slice(5).trim()
-      if (!data || data === '[DONE]') continue
-
-      try {
-        const parsed = JSON.parse(data) as {
-          choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>
-        }
-        const deltaContent = parsed.choices?.[0]?.delta?.content
-        const messageContent = parsed.choices?.[0]?.message?.content
-        let merged = fullContent
-        if (typeof deltaContent === 'string' && deltaContent) {
-          merged = fullContent + deltaContent
-          hasDeltaChunks = true
-        } else if (!hasDeltaChunks && typeof messageContent === 'string' && messageContent) {
-          merged = mergeMessageSnapshot(fullContent, messageContent)
-        }
-        if (merged === fullContent) continue
-        fullContent = merged
-        const partialReply = extractAssistantReplyFromPartialJson(fullContent)
-        if (partialReply !== null && partialReply !== lastAssistantReply) {
-          lastAssistantReply = partialReply
-          callbacks?.onAssistantReplyChunk?.(partialReply)
-        }
-      } catch {
-        // Ignore malformed chunks from providers.
+  const fullContent = await streamChatCompletion({
+    config: request.config,
+    messages: [
+      { role: 'system', content: systemPrompt },
+      ...historyMessages,
+      { role: 'user', content: userCommandPrompt },
+    ],
+    body: {
+      temperature: 0.5,
+    },
+    signal,
+    onChunk: (content) => {
+      const partialReply = extractAssistantReplyFromPartialJson(content)
+      if (partialReply !== null && partialReply !== lastAssistantReply) {
+        lastAssistantReply = partialReply
+        callbacks?.onAssistantReplyChunk?.(partialReply)
       }
-    }
-  }
-
-  const tail = sseBuffer.trim()
-  if (tail.startsWith('data:')) {
-    const data = tail.slice(5).trim()
-    if (data && data !== '[DONE]') {
-      try {
-        const parsed = JSON.parse(data) as {
-          choices?: Array<{ delta?: { content?: string }; message?: { content?: string } }>
-        }
-        const deltaContent = parsed.choices?.[0]?.delta?.content
-        const messageContent = parsed.choices?.[0]?.message?.content
-        if (typeof deltaContent === 'string' && deltaContent) {
-          fullContent += deltaContent
-        } else if (!hasDeltaChunks && typeof messageContent === 'string' && messageContent) {
-          fullContent = mergeMessageSnapshot(fullContent, messageContent)
-        }
-      } catch {
-        // Ignore malformed tail chunk.
-      }
-    }
-  }
+    },
+  })
 
   const normalized = normalizeTurnResponse(fullContent)
   callbacks?.onAssistantReplyChunk?.(normalized.assistantReply)

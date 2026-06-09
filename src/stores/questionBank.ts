@@ -9,10 +9,12 @@ import {
   getQuestionBankState,
   upsertQuestionBankState,
 } from '@/services/supabase'
+import { loadJson, saveJson } from '@/services/safeStorage'
 import {
   createQuestionBankCloudManager,
   type QuestionBankCloudData,
 } from './questionBankCloud'
+import type { SyncConflict } from './syncConflict'
 
 export interface Question {
   id: string
@@ -73,7 +75,18 @@ interface QuestionBankDataset {
 
 const STORAGE_KEY = 'question-bank-added-questions'
 const PRACTICE_STORAGE_KEY = 'question-bank-practice-records'
+const QUESTION_BANK_LOCAL_SCHEMA_VERSION = 1
 const AI_GENERATED_SOURCES: QuestionSource[] = ['resume-generated', 'project-generated', 'interview-review']
+
+interface AddedQuestionsStorageData {
+  schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
+  questions: Question[]
+}
+
+interface PracticeRecordsStorageData {
+  schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
+  records: Record<string, PracticeRecord>
+}
 
 function clampScore(value: unknown): number {
   if (typeof value !== 'number' || Number.isNaN(value)) return 0
@@ -173,40 +186,36 @@ function normalizeQuestion(input: Question, fallbackSource: QuestionSource): Que
 }
 
 function loadAddedQuestions(): Question[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    return stored
-      ? (JSON.parse(stored) as Question[]).map((item) => normalizeQuestion(item, 'manual'))
-      : []
-  } catch {
-    return []
-  }
+  const value = loadJson<AddedQuestionsStorageData | Question[]>(localStorage, STORAGE_KEY, []).value
+  const questions = Array.isArray(value) ? value : Array.isArray(value.questions) ? value.questions : []
+  return questions.map((item) => normalizeQuestion(item, 'manual'))
 }
 
 function saveAddedQuestions(questions: Question[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(questions))
-  } catch {
-    // ignore
-  }
+  saveJson(localStorage, STORAGE_KEY, {
+    schemaVersion: QUESTION_BANK_LOCAL_SCHEMA_VERSION,
+    questions,
+  } satisfies AddedQuestionsStorageData)
 }
 
 function loadPracticeRecords(): Record<string, PracticeRecord> {
-  try {
-    const stored = localStorage.getItem(PRACTICE_STORAGE_KEY)
-    if (!stored) return {}
-    return normalizePracticeRecords(JSON.parse(stored))
-  } catch {
-    return {}
-  }
+  const value = loadJson<PracticeRecordsStorageData | Record<string, PracticeRecord>>(
+    localStorage,
+    PRACTICE_STORAGE_KEY,
+    {},
+  ).value
+  const records =
+    value && typeof value === 'object' && !Array.isArray(value) && 'records' in value
+      ? value.records
+      : value
+  return normalizePracticeRecords(records)
 }
 
 function savePracticeRecords(records: Record<string, PracticeRecord>) {
-  try {
-    localStorage.setItem(PRACTICE_STORAGE_KEY, JSON.stringify(records))
-  } catch {
-    // ignore
-  }
+  saveJson(localStorage, PRACTICE_STORAGE_KEY, {
+    schemaVersion: QUESTION_BANK_LOCAL_SCHEMA_VERSION,
+    records,
+  } satisfies PracticeRecordsStorageData)
 }
 
 async function loadBundledQuestionBankData(): Promise<QuestionBankDataset> {
@@ -245,6 +254,18 @@ function clonePracticeRecords(records: Record<string, PracticeRecord>): Record<s
 
 function getRecordTime(record: PracticeRecord): number {
   return record.updatedAt ?? record.aiReview?.updatedAt ?? 0
+}
+
+function getQuestionBankUpdatedAt(
+  questions: readonly Question[],
+  records: Record<string, PracticeRecord>,
+): number {
+  const recordUpdatedAt = Object.values(records).reduce(
+    (max, record) => Math.max(max, getRecordTime(record)),
+    0,
+  )
+  const hasAddedQuestions = questions.length > 0
+  return Math.max(recordUpdatedAt, hasAddedQuestions ? Date.now() : 0)
 }
 
 function mergePracticeRecords(
@@ -291,6 +312,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
   const cloudSyncStatus = ref<'idle' | 'pulling' | 'pushing'>('idle')
   const cloudSyncError = ref('')
   const cloudLastSyncedAt = ref<number | null>(null)
+  const cloudConflict = ref<SyncConflict | null>(null)
 
   const questions = computed(() => [...bundledQuestions.value, ...addedQuestions.value])
 
@@ -301,7 +323,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
       schemaVersion: 1,
       addedQuestions: addedQuestions.value.map((item) => ({ ...item })),
       practiceRecords: clonePracticeRecords(practiceRecords.value),
-      updatedAt: Date.now(),
+      updatedAt: getQuestionBankUpdatedAt(addedQuestions.value, practiceRecords.value),
     }
   }
 
@@ -331,6 +353,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
       cloudSyncStatus,
       cloudSyncError,
       cloudLastSyncedAt,
+      cloudConflict,
     },
     getData: getCloudData,
     loadData: loadCloudData,
@@ -705,6 +728,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
     cloudSyncStatus,
     cloudSyncError,
     cloudLastSyncedAt,
+    cloudConflict,
     filteredQuestions,
     selectedQuestionIndex,
     selectedQuestion,
@@ -738,6 +762,8 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
     ensureBundledQuestionsLoaded,
     pushToCloud: cloudManager.pushToCloud,
     pullFromCloud: cloudManager.pullFromCloud,
+    resolveConflictWithCloud: cloudManager.resolveConflictWithCloud,
+    resolveConflictWithLocal: cloudManager.resolveConflictWithLocal,
     getCloudData,
   }
 })

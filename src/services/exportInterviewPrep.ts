@@ -338,36 +338,67 @@ export async function downloadInterviewPrepPdf(filename: string, markdown: strin
   host.style.width = '794px'
   host.style.background = '#ffffff'
   host.style.pointerEvents = 'none'
-  host.style.opacity = '0'
   host.innerHTML = buildInterviewPrepHtmlDocument(title, markdown)
   document.body.appendChild(host)
 
   try {
-    const html2pdfModule = await import('html2pdf.js') as unknown as {
-      default?: () => {
-        set: (options: Record<string, unknown>) => {
-          from: (source: HTMLElement) => {
-            save: () => Promise<void>
-          }
-        }
-      }
-    }
-    const html2pdf = html2pdfModule.default
-    if (!html2pdf) {
-      throw new Error('未能加载 PDF 导出模块')
+    const [{ default: html2canvas }, { jsPDF }] = await Promise.all([
+      import('html2canvas'),
+      import('jspdf'),
+    ])
+    await document.fonts?.ready
+
+    const canvas = await html2canvas(host, {
+      scale: 2,
+      useCORS: true,
+      backgroundColor: '#ffffff',
+      width: 794,
+      windowWidth: 794,
+      scrollX: 0,
+      scrollY: 0,
+    })
+
+    const pdf = new jsPDF({
+      unit: 'mm',
+      format: 'a4',
+      orientation: 'portrait',
+      compress: true,
+    })
+
+    const marginMm = 10
+    const pageWidthMm = 210
+    const pageHeightMm = 297
+    const innerWidthMm = pageWidthMm - marginMm * 2
+    const innerHeightMm = pageHeightMm - marginMm * 2
+    const sliceHeightPx = Math.floor(canvas.width * (innerHeightMm / innerWidthMm))
+    const totalPages = Math.max(1, Math.ceil(canvas.height / sliceHeightPx))
+
+    for (let pageIndex = 0; pageIndex < totalPages; pageIndex += 1) {
+      const startY = pageIndex * sliceHeightPx
+      const heightPx = Math.min(sliceHeightPx, canvas.height - startY)
+      const pageCanvas = document.createElement('canvas')
+      pageCanvas.width = canvas.width
+      pageCanvas.height = heightPx
+      const ctx = pageCanvas.getContext('2d')
+      if (!ctx) throw new Error('未能创建 PDF 渲染上下文')
+      ctx.fillStyle = '#ffffff'
+      ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+      ctx.drawImage(canvas, 0, startY, canvas.width, heightPx, 0, 0, canvas.width, heightPx)
+
+      if (pageIndex > 0) pdf.addPage('a4', 'portrait')
+      pdf.addImage(
+        pageCanvas.toDataURL('image/jpeg', 0.96),
+        'JPEG',
+        marginMm,
+        marginMm,
+        innerWidthMm,
+        (heightPx / canvas.width) * innerWidthMm,
+        undefined,
+        'FAST',
+      )
     }
 
-    await html2pdf()
-      .set({
-        margin: [10, 10, 10, 10],
-        filename: filename.endsWith('.pdf') ? filename : `${filename}.pdf`,
-        image: { type: 'jpeg', quality: 0.96 },
-        html2canvas: { scale: 2, useCORS: true, backgroundColor: '#ffffff' },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: ['css', 'legacy'] },
-      })
-      .from(host)
-      .save()
+    pdf.save(filename.endsWith('.pdf') ? filename : `${filename}.pdf`)
   } finally {
     host.remove()
   }

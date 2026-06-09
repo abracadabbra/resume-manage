@@ -24,8 +24,8 @@ async function handleSubmit() {
       await store.register(email.value, password.value)
     }
     emit('close')
-  } catch (e: any) {
-    error.value = e.message || '操作失败'
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '操作失败'
   } finally {
     loading.value = false
   }

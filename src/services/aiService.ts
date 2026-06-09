@@ -5,6 +5,7 @@ import type {
   ProjectEntry,
   WorkEntry,
 } from '@/stores/resume'
+import { streamChatCompletion } from './aiClient'
 import { getModuleOutputRules, SYSTEM_PROMPT } from './prompts'
 
 function formatBasicInfo(info: BasicInfo): string {
@@ -176,75 +177,16 @@ ${moduleText}
 请严格遵守以下输出要求：
 ${outputRules}`
 
-  let baseUrl = config.apiUrl.trim().replace(/\/+$/, '')
-  if (!baseUrl.includes('/v1/chat/completions')) {
-    if (!baseUrl.endsWith('/v1')) {
-      baseUrl += '/v1'
-    }
-    baseUrl += '/chat/completions'
-  }
-
   try {
-    const response = await fetch(baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiToken}`,
-      },
-      body: JSON.stringify({
-        model: config.modelName,
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
-          { role: 'user', content: userMessage },
-        ],
-        stream: true,
-      }),
+    const fullText = await streamChatCompletion({
+      config,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: userMessage },
+      ],
       signal,
+      onChunk: callbacks.onChunk,
     })
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '')
-      callbacks.onError(`API 请求失败 (${response.status}): ${errorText || response.statusText}`)
-      return
-    }
-
-    const reader = response.body?.getReader()
-    if (!reader) {
-      callbacks.onError('无法读取 API 响应流')
-      return
-    }
-
-    const decoder = new TextDecoder()
-    let fullText = ''
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data:')) continue
-        const data = trimmed.slice(5).trim()
-        if (data === '[DONE]') continue
-
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.message?.content
-          if (content) {
-            fullText += content
-            callbacks.onChunk(fullText)
-          }
-        } catch {
-          // Ignore malformed streaming chunks.
-        }
-      }
-    }
-
     callbacks.onDone(fullText)
   } catch (err: unknown) {
     if (err instanceof DOMException && err.name === 'AbortError') {
@@ -338,4 +280,3 @@ export function parseAiResponse(text: string): ParsedAiResponse {
     optimizedContent,
   }
 }
-

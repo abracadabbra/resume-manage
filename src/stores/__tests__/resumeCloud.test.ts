@@ -23,6 +23,8 @@ function createState(): ResumeCloudState {
     userId: { value: null },
     currentResumeId: { value: null },
     resumeVersions: { value: [] },
+    cloudLastSyncedAt: { value: null },
+    cloudConflict: { value: null },
   }
 }
 
@@ -70,6 +72,39 @@ describe('resumeCloud', () => {
     expect(loadData).toHaveBeenCalledWith(activeResume.data)
   })
 
+  it('does not load active cloud data when local and cloud both changed after last sync', async () => {
+    const state = createState()
+    state.cloudLastSyncedAt.value = 200
+    const activeResume = createResumeRecord('resume-active', {
+      is_active: true,
+      updated_at: new Date(400).toISOString(),
+      data: { basicInfo: { name: 'Cloud' } },
+    })
+    const api = createApi({
+      getResumes: vi.fn().mockResolvedValue([activeResume]),
+      getActiveResume: vi.fn().mockResolvedValue(activeResume),
+    })
+    const loadData = vi.fn()
+
+    const manager = createResumeCloudManager({
+      api,
+      state,
+      getData: () => ({ basicInfo: { name: 'Local' } }),
+      loadData,
+      getLocalUpdatedAt: () => 300,
+    })
+
+    await manager.login('alice@example.com', 'secret123')
+
+    expect(loadData).not.toHaveBeenCalled()
+    expect(state.cloudConflict.value).toEqual({
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    })
+    expect(state.currentResumeId.value).toBe('resume-active')
+  })
+
   it('registers without loading cloud resumes immediately', async () => {
     const state = createState()
     const api = createApi()
@@ -112,6 +147,112 @@ describe('resumeCloud', () => {
     expect(api.updateResume).toHaveBeenCalledWith('resume-current', { basicInfo: { name: 'Alice' } })
     expect(api.createResume).not.toHaveBeenCalled()
     expect(state.resumeVersions.value).toEqual(resumeList)
+  })
+
+  it('does not update cloud resume when saving would overwrite a changed cloud version', async () => {
+    const state = createState()
+    state.isLoggedIn.value = true
+    state.userId.value = 'user-1'
+    state.currentResumeId.value = 'resume-current'
+    state.cloudLastSyncedAt.value = 200
+    const activeResume = createResumeRecord('resume-current', {
+      is_active: true,
+      updated_at: new Date(400).toISOString(),
+      data: { basicInfo: { name: 'Cloud' } },
+    })
+    const api = createApi({
+      getActiveResume: vi.fn().mockResolvedValue(activeResume),
+    })
+
+    const manager = createResumeCloudManager({
+      api,
+      state,
+      getData: () => ({ basicInfo: { name: 'Local' } }),
+      loadData: vi.fn(),
+      getLocalUpdatedAt: () => 300,
+    })
+
+    const result = await manager.saveToCloud()
+
+    expect(result).toBe(activeResume)
+    expect(api.updateResume).not.toHaveBeenCalled()
+    expect(state.cloudConflict.value).toEqual({
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    })
+  })
+
+  it('resolves a resume conflict by using the cloud version', async () => {
+    const state = createState()
+    state.isLoggedIn.value = true
+    state.userId.value = 'user-1'
+    state.cloudConflict.value = {
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    }
+    const activeResume = createResumeRecord('resume-active', {
+      is_active: true,
+      updated_at: new Date(400).toISOString(),
+      data: { basicInfo: { name: 'Cloud' } },
+    })
+    const api = createApi({
+      getResumes: vi.fn().mockResolvedValue([activeResume]),
+      getActiveResume: vi.fn().mockResolvedValue(activeResume),
+    })
+    const loadData = vi.fn()
+
+    const manager = createResumeCloudManager({
+      api,
+      state,
+      getData: () => ({ basicInfo: { name: 'Local' } }),
+      loadData,
+      getLocalUpdatedAt: () => 300,
+    })
+
+    await manager.resolveConflictWithCloud()
+
+    expect(loadData).toHaveBeenCalledWith(activeResume.data)
+    expect(state.currentResumeId.value).toBe('resume-active')
+    expect(state.cloudConflict.value).toBeNull()
+    expect(state.cloudLastSyncedAt.value).toBe(400)
+  })
+
+  it('resolves a resume conflict by keeping the local version', async () => {
+    const state = createState()
+    state.isLoggedIn.value = true
+    state.userId.value = 'user-1'
+    state.currentResumeId.value = 'resume-current'
+    state.cloudConflict.value = {
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    }
+    const localData = { basicInfo: { name: 'Local' } }
+    const savedResume = createResumeRecord('resume-current', {
+      updated_at: new Date(500).toISOString(),
+      data: localData,
+    })
+    const api = createApi({
+      updateResume: vi.fn().mockResolvedValue(savedResume),
+      getResumes: vi.fn().mockResolvedValue([savedResume]),
+      getActiveResume: vi.fn().mockResolvedValue(savedResume),
+    })
+
+    const manager = createResumeCloudManager({
+      api,
+      state,
+      getData: () => localData,
+      loadData: vi.fn(),
+      getLocalUpdatedAt: () => 300,
+    })
+
+    await manager.resolveConflictWithLocal()
+
+    expect(api.updateResume).toHaveBeenCalledWith('resume-current', localData)
+    expect(state.cloudConflict.value).toBeNull()
+    expect(state.cloudLastSyncedAt.value).toBe(500)
   })
 
   it('creates a new cloud version and reloads active resume', async () => {

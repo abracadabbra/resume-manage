@@ -21,7 +21,7 @@ Docker: `docker compose up --build -d` → http://localhost:3000
 - Vue 3 (Composition API + `<script setup>`) / TypeScript / Vite 7
 - State: Pinia stores with localStorage auto-persistence
 - Linting: oxlint + eslint (run in sequence); formatting: oxfmt (not prettier)
-- PDF export: html2pdf.js; Markdown rendering: markdown-it
+- PDF export: html2canvas + jsPDF; Markdown rendering: markdown-it
 - Path alias: `@` → `src/`
 
 ## Architecture

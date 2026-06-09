@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { reactive, ref, watch } from 'vue'
+import { reactive, ref } from 'vue'
 import { normalizeResumeTemplateKey, type ResumeTemplateKey } from '@/templates/resume'
 import {
   applyResumeData,
@@ -8,6 +8,9 @@ import {
   saveResumeDataToStorage,
 } from './resumePersistence'
 import { createResumeCloudManager } from './resumeCloud'
+import type { SyncConflict } from './syncConflict'
+import { useDebouncedAutoSave } from './useDebouncedAutoSave'
+import { loadJson, saveJson } from '@/services/safeStorage'
 import { 
   signUp, 
   signIn, 
@@ -376,6 +379,7 @@ export const useResumeStore = defineStore('resume', () => {
   }
 
   const STORAGE_KEY = 'resume-builder-data'
+  const LOCAL_UPDATED_AT_KEY = 'resume-builder-data-updated-at'
   const AUTO_SAVE_DELAY_MS = 500
   const SAVE_LOADING_MIN_MS = 900
 
@@ -383,6 +387,9 @@ export const useResumeStore = defineStore('resume', () => {
   const userId = ref<string | null>(null)
   const currentResumeId = ref<string | null>(null)
   const resumeVersions = ref<ResumeRecord[]>([])
+  const localUpdatedAt = ref(loadJson<number>(localStorage, LOCAL_UPDATED_AT_KEY, 0).value)
+  const cloudLastSyncedAt = ref<number | null>(null)
+  const cloudConflict = ref<SyncConflict | null>(null)
 
   function getData() {
     return createResumeDataSnapshot(resumeState)
@@ -414,9 +421,12 @@ export const useResumeStore = defineStore('resume', () => {
       userId,
       currentResumeId,
       resumeVersions,
+      cloudLastSyncedAt,
+      cloudConflict,
     },
     getData,
     loadData,
+    getLocalUpdatedAt: () => localUpdatedAt.value,
   })
 
   let saveLoadingTimer: ReturnType<typeof setTimeout> | null = null
@@ -430,13 +440,16 @@ export const useResumeStore = defineStore('resume', () => {
     }, SAVE_LOADING_MIN_MS)
   }
 
+  let autoSaveHandle: ReturnType<typeof useDebouncedAutoSave> | null = null
+
   function saveToStorage(mode: 'auto' | 'manual' = 'manual') {
-    if (mode === 'manual' && saveTimer) {
-      clearTimeout(saveTimer)
-      saveTimer = null
+    if (mode === 'manual') {
+      autoSaveHandle?.cancelPending()
     }
     markSavingState()
     saveResumeDataToStorage(localStorage, STORAGE_KEY, getData())
+    localUpdatedAt.value = Date.now()
+    saveJson(localStorage, LOCAL_UPDATED_AT_KEY, localUpdatedAt.value)
     nextAutoSaveAt.value = null
     lastSavedAt.value = Date.now()
     lastSaveMode.value = mode
@@ -453,29 +466,14 @@ export const useResumeStore = defineStore('resume', () => {
 
   loadFromStorage()
 
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(
-    [
-      () => JSON.stringify(basicInfo),
-      () => JSON.stringify(educationList),
-      skills,
-      () => JSON.stringify(workList),
-      () => JSON.stringify(projectList),
-      () => JSON.stringify(awardList),
-      selfIntro,
-      selectedTemplateKey,
-      () => JSON.stringify(modules),
-    ],
-    () => {
-      if (saveTimer) clearTimeout(saveTimer)
-      nextAutoSaveAt.value = Date.now() + AUTO_SAVE_DELAY_MS
-      saveTimer = setTimeout(() => {
-        saveTimer = null
-        saveToStorage('auto')
-      }, AUTO_SAVE_DELAY_MS)
+  autoSaveHandle = useDebouncedAutoSave({
+    delayMs: AUTO_SAVE_DELAY_MS,
+    getSnapshot: getData,
+    onScheduled: (nextSaveAt) => {
+      nextAutoSaveAt.value = nextSaveAt
     },
-    { deep: true }
-  )
+    onSave: () => saveToStorage('auto'),
+  })
 
   return {
     modules,
@@ -516,6 +514,9 @@ export const useResumeStore = defineStore('resume', () => {
     userId,
     currentResumeId,
     resumeVersions,
+    localUpdatedAt,
+    cloudLastSyncedAt,
+    cloudConflict,
     getSnapshot: getData,
     login: cloudManager.login,
     register: cloudManager.register,
@@ -524,5 +525,7 @@ export const useResumeStore = defineStore('resume', () => {
     switchVersion: cloudManager.switchVersion,
     removeVersion: cloudManager.removeVersion,
     saveToCloud: cloudManager.saveToCloud,
+    resolveCloudConflictWithCloud: cloudManager.resolveConflictWithCloud,
+    resolveCloudConflictWithLocal: cloudManager.resolveConflictWithLocal,
   }
 })

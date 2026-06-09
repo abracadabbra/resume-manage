@@ -44,7 +44,14 @@ const shortcutHint = '快捷键：J/K 切题 · 1/2/3/4 改状态'
 
 const isCloudSyncing = computed(() => store.cloudSyncStatus !== 'idle')
 
+const cloudConflictText = computed(() => {
+  const conflict = store.cloudConflict
+  if (!conflict) return ''
+  return `本地 ${formatSyncTime(conflict.localUpdatedAt)} / 云端 ${formatSyncTime(conflict.cloudUpdatedAt)} 均有更新`
+})
+
 const cloudSyncMeta = computed(() => {
+  if (store.cloudConflict) return cloudConflictText.value
   if (!resumeStore.isLoggedIn) return '登录后可跨设备同步题库和练习记录'
   if (store.cloudLastSyncedAt) {
     return `上次同步：${formatSyncTime(store.cloudLastSyncedAt)}`
@@ -80,6 +87,30 @@ async function handlePushToCloud() {
   try {
     await store.pushToCloud(resumeStore.userId)
     cloudSyncMessage.value = '题库已上传到云端'
+  } catch {
+    cloudSyncMessage.value = ''
+  }
+}
+
+async function handleUseCloudVersion() {
+  if (!resumeStore.userId || isCloudSyncing.value) return
+  cloudSyncMessage.value = ''
+
+  try {
+    const record = await store.resolveConflictWithCloud(resumeStore.userId)
+    cloudSyncMessage.value = record ? '已使用云端题库' : '云端暂无题库数据'
+  } catch {
+    cloudSyncMessage.value = ''
+  }
+}
+
+async function handleKeepLocalVersion() {
+  if (!resumeStore.userId || isCloudSyncing.value) return
+  cloudSyncMessage.value = ''
+
+  try {
+    await store.resolveConflictWithLocal(resumeStore.userId)
+    cloudSyncMessage.value = '已保留本地题库并上传'
   } catch {
     cloudSyncMessage.value = ''
   }
@@ -197,9 +228,29 @@ onUnmounted(() => {
           <div class="cloud-sync-card">
             <div class="cloud-copy">
               <span class="cloud-title">云同步</span>
-              <span class="cloud-meta">{{ cloudSyncMessage || store.cloudSyncError || cloudSyncMeta }}</span>
+              <span class="cloud-meta" :class="{ conflict: Boolean(store.cloudConflict) }">
+                {{ cloudSyncMessage || store.cloudSyncError || cloudSyncMeta }}
+              </span>
             </div>
-            <div class="cloud-actions">
+            <div v-if="store.cloudConflict" class="cloud-actions">
+              <button
+                type="button"
+                class="sync-btn"
+                :disabled="!resumeStore.isLoggedIn || isCloudSyncing"
+                @click="handleUseCloudVersion"
+              >
+                {{ store.cloudSyncStatus === 'pulling' ? '处理中...' : '使用云端' }}
+              </button>
+              <button
+                type="button"
+                class="sync-btn primary"
+                :disabled="!resumeStore.isLoggedIn || isCloudSyncing"
+                @click="handleKeepLocalVersion"
+              >
+                {{ store.cloudSyncStatus === 'pushing' ? '处理中...' : '保留本地' }}
+              </button>
+            </div>
+            <div v-else class="cloud-actions">
               <button
                 type="button"
                 class="sync-btn"
@@ -347,13 +398,17 @@ onUnmounted(() => {
 }
 
 .cloud-meta {
-  max-width: 220px;
+  max-width: 260px;
   font-size: 11px;
   color: #7b6a5b;
   line-height: 1.35;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.cloud-meta.conflict {
+  color: #a45a22;
 }
 
 .cloud-actions {

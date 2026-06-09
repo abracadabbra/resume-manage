@@ -1,0 +1,175 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1781020946591,
+  "projectRoot": "/Users/shentao/Library/Mobile Documents/com~apple~CloudDocs/其他/resume-builder-main",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": "^20.19.0 || >=22.12.0",
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      },
+      {
+        "name": "TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "tsconfig.json"
+        ]
+      }
+    ],
+    "frameworks": [
+      {
+        "name": "vue",
+        "version": "3.5.29",
+        "category": "frontend"
+      },
+      {
+        "name": "vite",
+        "version": "7.3.1",
+        "category": "build"
+      },
+      {
+        "name": "vitest",
+        "version": "4.1.6",
+        "category": "testing"
+      }
+    ],
+    "packageManager": "npm",
+    "runtime": "Node.js 20.19.0||22.12.0"
+  },
+  "build": {
+    "buildCommand": "npm run build",
+    "testCommand": null,
+    "lintCommand": "npm run lint",
+    "devCommand": "npm run dev",
+    "scripts": {
+      "dev": "vite",
+      "build": "run-p type-check \"build-only {@}\" --",
+      "preview": "vite preview",
+      "build-only": "vite build",
+      "type-check": "vue-tsc --build",
+      "test:unit": "vitest run",
+      "lint": "run-s lint:oxlint lint:eslint",
+      "lint:fix": "run-s lint:oxlint:fix lint:eslint:fix",
+      "lint:oxlint": "oxlint .",
+      "lint:oxlint:fix": "oxlint . --fix",
+      "lint:eslint": "eslint .",
+      "lint:eslint:fix": "eslint . --fix",
+      "format": "oxfmt src/"
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": "type-based"
+  },
+  "structure": {
+    "isMonorepo": false,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "public",
+      "src"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "dist": {
+      "path": "dist",
+      "purpose": "Distribution/build output",
+      "fileCount": 2,
+      "lastAccessed": 1781020946549,
+      "keyFiles": [
+        "favicon.svg",
+        "index.html"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 1,
+      "lastAccessed": 1781020946551,
+      "keyFiles": [
+        "面试题库-沈涛.md"
+      ]
+    },
+    "public": {
+      "path": "public",
+      "purpose": "Public files",
+      "fileCount": 1,
+      "lastAccessed": 1781020946569,
+      "keyFiles": [
+        "favicon.svg"
+      ]
+    },
+    "src": {
+      "path": "src",
+      "purpose": "Source code",
+      "fileCount": 2,
+      "lastAccessed": 1781020946570,
+      "keyFiles": [
+        "App.vue",
+        "main.ts"
+      ]
+    },
+    "dist/assets": {
+      "path": "dist/assets",
+      "purpose": "Static assets",
+      "fileCount": 42,
+      "lastAccessed": 1781020946571,
+      "keyFiles": [
+        "AiConfigDialog-CknwIhw3.css",
+        "AiConfigDialog-D2nM3y9Z.js",
+        "AiInterviewerPanel-3zvc296J.js"
+      ]
+    },
+    "src/assets": {
+      "path": "src/assets",
+      "purpose": "Static assets",
+      "fileCount": 1,
+      "lastAccessed": 1781020946573,
+      "keyFiles": [
+        "main.css"
+      ]
+    },
+    "src/components": {
+      "path": "src/components",
+      "purpose": "UI components",
+      "fileCount": 0,
+      "lastAccessed": 1781020946573,
+      "keyFiles": []
+    },
+    "src/data": {
+      "path": "src/data",
+      "purpose": "Data files",
+      "fileCount": 2,
+      "lastAccessed": 1781020946575,
+      "keyFiles": [
+        "interview-questions.json",
+        "jd-default-questions.json"
+      ]
+    },
+    "src/services": {
+      "path": "src/services",
+      "purpose": "Business logic services",
+      "fileCount": 28,
+      "lastAccessed": 1781020946576,
+      "keyFiles": [
+        "aiClient.test.ts",
+        "aiClient.ts",
+        "aiService.ts"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

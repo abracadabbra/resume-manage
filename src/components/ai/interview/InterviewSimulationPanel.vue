@@ -170,7 +170,7 @@ watch(
         >
           <p class="chat-role">{{ item.role === 'assistant' ? assistantName : '你' }}</p>
           <template v-if="item.role === 'assistant'">
-            <div class="chat-markdown markdown-content" v-html="renderMarkdown(item.content)" />
+            <div class="chat-markdown markdown-content" v-safe-html="renderMarkdown(item.content)" />
             <span
               v-if="props.streamingAssistantMessageId === item.id"
               class="stream-cursor"

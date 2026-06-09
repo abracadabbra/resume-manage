@@ -197,7 +197,10 @@ describe('questionBank store', () => {
 
     const stored = localStorage.getItem(STORAGE_KEY)
     expect(stored).not.toBeNull()
-    expect(JSON.parse(stored ?? '[]')).toHaveLength(1)
+    expect(JSON.parse(stored ?? '{}')).toMatchObject({
+      schemaVersion: 1,
+      questions: [expect.objectContaining({ title: '新增一道题' })],
+    })
     expect(store.questions).toHaveLength(2)
   })
 
@@ -401,10 +404,13 @@ describe('questionBank store', () => {
     const stored = localStorage.getItem('question-bank-practice-records')
     expect(stored).not.toBeNull()
     expect(JSON.parse(stored ?? '{}')).toMatchObject({
-      ch1_q1: {
-        answer: '我会先讲线程池的七个核心参数',
-        notes: '拒绝策略还要再补一遍',
-        mastery: 'practicing',
+      schemaVersion: 1,
+      records: {
+        ch1_q1: {
+          answer: '我会先讲线程池的七个核心参数',
+          notes: '拒绝策略还要再补一遍',
+          mastery: 'practicing',
+        },
       },
     })
   })
@@ -731,13 +737,19 @@ describe('questionBank store', () => {
       mastery: 'mastered',
       updatedAt: 300,
     })
-    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '[]')).toHaveLength(2)
+    expect(JSON.parse(localStorage.getItem(STORAGE_KEY) ?? '{}')).toMatchObject({
+      schemaVersion: 1,
+      questions: [expect.any(Object), expect.any(Object)],
+    })
     expect(JSON.parse(localStorage.getItem(PRACTICE_STORAGE_KEY) ?? '{}')).toMatchObject({
-      ch1_q1: {
-        answer: '云端较新回答',
-      },
-      added_local: {
-        answer: '本地自定义题回答',
+      schemaVersion: 1,
+      records: {
+        ch1_q1: {
+          answer: '云端较新回答',
+        },
+        added_local: {
+          answer: '本地自定义题回答',
+        },
       },
     })
   })

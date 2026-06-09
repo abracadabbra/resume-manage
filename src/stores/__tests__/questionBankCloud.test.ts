@@ -21,6 +21,7 @@ function createState(): QuestionBankCloudState {
     cloudSyncStatus: { value: 'idle' },
     cloudSyncError: { value: '' },
     cloudLastSyncedAt: { value: null },
+    cloudConflict: { value: null },
   }
 }
 
@@ -53,6 +54,7 @@ describe('questionBankCloud', () => {
     expect(api.upsertQuestionBankState).toHaveBeenCalledWith('user-1', data)
     expect(state.cloudSyncStatus.value).toBe('idle')
     expect(state.cloudSyncError.value).toBe('')
+    expect(state.cloudConflict.value).toBeNull()
     expect(state.cloudLastSyncedAt.value).toBe(new Date('2026-06-07T10:00:00.000Z').getTime())
   })
 
@@ -79,6 +81,145 @@ describe('questionBankCloud', () => {
     expect(loadData).toHaveBeenCalledWith(data)
     expect(state.cloudLastSyncedAt.value).toBe(new Date('2026-06-07T11:00:00.000Z').getTime())
     expect(state.cloudSyncStatus.value).toBe('idle')
+    expect(state.cloudConflict.value).toBeNull()
+  })
+
+  it('skips pull and exposes conflict when local and cloud both changed after last sync', async () => {
+    const state = createState()
+    state.cloudLastSyncedAt.value = 200
+    const localData = createCloudData()
+    localData.updatedAt = 300
+    const cloudData = createCloudData()
+    cloudData.updatedAt = 400
+    const loadData = vi.fn()
+    const api = createApi({
+      getQuestionBankState: vi.fn().mockResolvedValue({
+        user_id: 'user-1',
+        data: cloudData,
+        updated_at: '2026-06-07T11:00:00.000Z',
+      }),
+    })
+    const manager = createQuestionBankCloudManager({
+      api,
+      state,
+      getData: () => localData,
+      loadData,
+    })
+
+    const result = await manager.pullFromCloud('user-1')
+
+    expect(result?.data).toBe(cloudData)
+    expect(loadData).not.toHaveBeenCalled()
+    expect(state.cloudConflict.value).toEqual({
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    })
+    expect(state.cloudSyncError.value).toContain('检测到本地和云端都有更新')
+    expect(state.cloudLastSyncedAt.value).toBe(200)
+  })
+
+  it('skips push and exposes conflict when cloud changed after last sync too', async () => {
+    const state = createState()
+    state.cloudLastSyncedAt.value = 200
+    const localData = createCloudData()
+    localData.updatedAt = 300
+    const cloudData = createCloudData()
+    cloudData.updatedAt = 400
+    const api = createApi({
+      getQuestionBankState: vi.fn().mockResolvedValue({
+        user_id: 'user-1',
+        data: cloudData,
+        updated_at: '2026-06-07T11:00:00.000Z',
+      }),
+    })
+    const manager = createQuestionBankCloudManager({
+      api,
+      state,
+      getData: () => localData,
+      loadData: vi.fn(),
+    })
+
+    const result = await manager.pushToCloud('user-1')
+
+    expect(result.data).toBe(cloudData)
+    expect(api.upsertQuestionBankState).not.toHaveBeenCalled()
+    expect(state.cloudConflict.value).toEqual({
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    })
+    expect(state.cloudSyncError.value).toContain('检测到本地和云端都有更新')
+    expect(state.cloudLastSyncedAt.value).toBe(200)
+  })
+
+  it('resolves a conflict by loading the cloud version and clearing conflict state', async () => {
+    const state = createState()
+    state.cloudConflict.value = {
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    }
+    state.cloudSyncError.value = '检测到本地和云端都有更新'
+    const cloudData = createCloudData()
+    cloudData.updatedAt = 400
+    const loadData = vi.fn()
+    const api = createApi({
+      getQuestionBankState: vi.fn().mockResolvedValue({
+        user_id: 'user-1',
+        data: cloudData,
+        updated_at: '2026-06-07T12:00:00.000Z',
+      }),
+    })
+    const manager = createQuestionBankCloudManager({
+      api,
+      state,
+      getData: createCloudData,
+      loadData,
+    })
+
+    const result = await manager.resolveConflictWithCloud('user-1')
+
+    expect(result?.data).toBe(cloudData)
+    expect(loadData).toHaveBeenCalledWith(cloudData)
+    expect(state.cloudConflict.value).toBeNull()
+    expect(state.cloudSyncError.value).toBe('')
+    expect(state.cloudSyncStatus.value).toBe('idle')
+    expect(state.cloudLastSyncedAt.value).toBe(new Date('2026-06-07T12:00:00.000Z').getTime())
+  })
+
+  it('resolves a conflict by pushing the local version and clearing conflict state', async () => {
+    const state = createState()
+    state.cloudConflict.value = {
+      localUpdatedAt: 300,
+      cloudUpdatedAt: 400,
+      lastSyncedAt: 200,
+    }
+    state.cloudSyncError.value = '检测到本地和云端都有更新'
+    const localData = createCloudData()
+    localData.updatedAt = 300
+    const api = createApi({
+      upsertQuestionBankState: vi.fn().mockResolvedValue({
+        user_id: 'user-1',
+        data: localData,
+        updated_at: '2026-06-07T12:30:00.000Z',
+      }),
+    })
+    const manager = createQuestionBankCloudManager({
+      api,
+      state,
+      getData: () => localData,
+      loadData: vi.fn(),
+    })
+
+    const result = await manager.resolveConflictWithLocal('user-1')
+
+    expect(result.data).toBe(localData)
+    expect(api.upsertQuestionBankState).toHaveBeenCalledWith('user-1', localData)
+    expect(state.cloudConflict.value).toBeNull()
+    expect(state.cloudSyncError.value).toBe('')
+    expect(state.cloudSyncStatus.value).toBe('idle')
+    expect(state.cloudLastSyncedAt.value).toBe(new Date('2026-06-07T12:30:00.000Z').getTime())
   })
 
   it('returns null when cloud has no question bank record', async () => {

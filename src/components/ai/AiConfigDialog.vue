@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { reactive, ref } from 'vue'
+import { requestChatCompletion } from '@/services/aiClient'
 import { useAiConfigStore } from '@/stores/aiConfig'
 
 const store = useAiConfigStore()
@@ -12,34 +13,15 @@ const form = reactive({
   apiUrl: store.apiUrl,
   apiToken: store.apiToken,
   modelName: store.modelName,
+  persistConfig: store.persistConfig,
 })
 
 const showToken = ref(false)
 const testing = ref(false)
 const testResult = ref<{ type: 'success' | 'error'; text: string } | null>(null)
 
-function normalizeApiUrl(raw: string): string {
-  let baseUrl = raw.trim().replace(/\/+$/, '')
-  if (!baseUrl.includes('/v1/chat/completions')) {
-    if (!baseUrl.endsWith('/v1')) baseUrl += '/v1'
-    baseUrl += '/chat/completions'
-  }
-  return baseUrl
-}
-
 function resetTestResult() {
   testResult.value = null
-}
-
-function extractErrorText(text: string): string {
-  const cleaned = text.trim()
-  if (!cleaned) return ''
-  try {
-    const parsed = JSON.parse(cleaned) as { error?: { message?: string }; message?: string }
-    return parsed.error?.message?.trim() || parsed.message?.trim() || cleaned
-  } catch {
-    return cleaned
-  }
 }
 
 async function handleTestConnection() {
@@ -57,41 +39,20 @@ async function handleTestConnection() {
   testing.value = true
   testResult.value = null
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 12_000)
-
   try {
-    const response = await fetch(normalizeApiUrl(apiUrl), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiToken}`,
+    await requestChatCompletion({
+      config: {
+        apiUrl,
+        apiToken,
+        modelName,
       },
-      body: JSON.stringify({
-        model: modelName,
-        messages: [{ role: 'user', content: 'ping' }],
-        stream: false,
+      messages: [{ role: 'user', content: 'ping' }],
+      body: {
         temperature: 0,
         max_tokens: 1,
-      }),
-      signal: controller.signal,
+      },
+      timeoutMs: 12_000,
     })
-
-    if (!response.ok) {
-      const errorText = extractErrorText(await response.text().catch(() => ''))
-      testResult.value = {
-        type: 'error',
-        text: `连接失败（${response.status}）：${errorText || response.statusText || '未知错误'}`,
-      }
-      return
-    }
-
-    const data = await response.json().catch(() => null)
-    const hasChoices = Array.isArray((data as { choices?: unknown[] } | null)?.choices)
-    if (!hasChoices) {
-      testResult.value = { type: 'error', text: '连接成功，但返回格式异常，请检查模型或服务兼容性。' }
-      return
-    }
 
     testResult.value = { type: 'success', text: '连接成功，当前模型可用。' }
   } catch (error: unknown) {
@@ -103,7 +64,6 @@ async function handleTestConnection() {
           : String(error ?? '未知错误')
     testResult.value = { type: 'error', text: `连接失败：${message}` }
   } finally {
-    clearTimeout(timeout)
     testing.value = false
   }
 }
@@ -113,6 +73,8 @@ function handleSave() {
     apiUrl: form.apiUrl.trim(),
     apiToken: form.apiToken.trim(),
     modelName: form.modelName.trim(),
+  }, {
+    persist: form.persistConfig,
   })
   emit('close')
 }
@@ -176,7 +138,13 @@ function handleCancel() {
                 </svg>
               </button>
             </div>
+            <span class="form-hint security-hint">API Key 仅保存在当前浏览器本地，请避免在共享设备上保存真实密钥。</span>
           </div>
+
+          <label class="config-checkbox">
+            <input v-model="form.persistConfig" type="checkbox" />
+            <span>保存到本机浏览器，下次打开自动沿用</span>
+          </label>
 
           <div class="form-group">
             <label class="form-label">模型名称</label>
@@ -345,6 +313,21 @@ function handleCancel() {
 .form-hint {
   font-size: 11px;
   color: #a89888;
+}
+
+.config-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #5c4f44;
+  cursor: pointer;
+}
+
+.config-checkbox input {
+  width: 14px;
+  height: 14px;
+  accent-color: #d97745;
 }
 
 .input-with-toggle {

@@ -1,4 +1,9 @@
 import type { ResumeRecord } from '@/services/supabase'
+import {
+  createSyncConflict,
+  decideSyncDecision,
+  type SyncConflict,
+} from './syncConflict'
 
 type ValueRef<T> = { value: T }
 
@@ -18,6 +23,8 @@ export interface ResumeCloudState {
   userId: ValueRef<string | null>
   currentResumeId: ValueRef<string | null>
   resumeVersions: ValueRef<ResumeRecord[]>
+  cloudLastSyncedAt: ValueRef<number | null>
+  cloudConflict: ValueRef<SyncConflict | null>
 }
 
 export interface ResumeCloudApi {
@@ -37,6 +44,7 @@ export interface ResumeCloudManagerOptions {
   state: ResumeCloudState
   getData: () => unknown
   loadData: (data: unknown) => void
+  getLocalUpdatedAt?: () => number
 }
 
 function requireUserId(state: ResumeCloudState): string {
@@ -47,8 +55,35 @@ function requireUserId(state: ResumeCloudState): string {
   return userId
 }
 
+function getCloudUpdatedAt(record: ResumeRecord): number {
+  const timestamp = new Date(record.updated_at).getTime()
+  return Number.isFinite(timestamp) ? timestamp : 0
+}
+
 export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
-  const { api, state, getData, loadData } = options
+  const { api, state, getData, loadData, getLocalUpdatedAt = () => 0 } = options
+
+  function shouldUseCloud(record: ResumeRecord): boolean {
+    const localUpdatedAt = getLocalUpdatedAt()
+    const cloudUpdatedAt = getCloudUpdatedAt(record)
+    const decision = decideSyncDecision({
+      localUpdatedAt,
+      cloudUpdatedAt,
+      lastSyncedAt: state.cloudLastSyncedAt.value,
+    })
+
+    if (decision === 'conflict') {
+      state.cloudConflict.value = createSyncConflict({
+        localUpdatedAt,
+        cloudUpdatedAt,
+        lastSyncedAt: state.cloudLastSyncedAt.value,
+      })
+      return false
+    }
+
+    state.cloudConflict.value = null
+    return decision === 'use-cloud'
+  }
 
   async function loadResumes() {
     const userId = state.userId.value
@@ -58,8 +93,9 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
 
     const active = await api.getActiveResume(userId)
     state.currentResumeId.value = active?.id ?? null
-    if (active) {
+    if (active && shouldUseCloud(active)) {
       loadData(active.data)
+      state.cloudLastSyncedAt.value = getCloudUpdatedAt(active)
     }
   }
 
@@ -88,6 +124,8 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
     state.isLoggedIn.value = false
     state.currentResumeId.value = null
     state.resumeVersions.value = []
+    state.cloudLastSyncedAt.value = null
+    state.cloudConflict.value = null
   }
 
   async function saveToCloud(name?: string) {
@@ -95,10 +133,33 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
     const data = getData()
 
     if (state.currentResumeId.value) {
-      await api.updateResume(state.currentResumeId.value, data)
+      const active = await api.getActiveResume(userId)
+      if (active && active.id === state.currentResumeId.value) {
+        const localUpdatedAt = getLocalUpdatedAt()
+        const cloudUpdatedAt = getCloudUpdatedAt(active)
+        const decision = decideSyncDecision({
+          localUpdatedAt,
+          cloudUpdatedAt,
+          lastSyncedAt: state.cloudLastSyncedAt.value,
+        })
+        if (decision === 'conflict') {
+          state.cloudConflict.value = createSyncConflict({
+            localUpdatedAt,
+            cloudUpdatedAt,
+            lastSyncedAt: state.cloudLastSyncedAt.value,
+          })
+          return active
+        }
+      }
+
+      const resume = await api.updateResume(state.currentResumeId.value, data)
+      state.cloudConflict.value = null
+      state.cloudLastSyncedAt.value = getCloudUpdatedAt(resume)
     } else if (name) {
       const resume = await api.createResume(userId, name, data)
       state.currentResumeId.value = resume.id
+      state.cloudConflict.value = null
+      state.cloudLastSyncedAt.value = getCloudUpdatedAt(resume)
     }
 
     await loadResumes()
@@ -109,6 +170,8 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
     const data = getData()
     const resume = await api.createResume(userId, name, data)
     state.currentResumeId.value = resume.id
+    state.cloudConflict.value = null
+    state.cloudLastSyncedAt.value = getCloudUpdatedAt(resume)
     await loadResumes()
   }
 
@@ -129,6 +192,37 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
     await loadResumes()
   }
 
+  async function resolveConflictWithCloud() {
+    const userId = requireUserId(state)
+    const active = await api.getActiveResume(userId)
+    if (!active) {
+      state.cloudConflict.value = null
+      state.cloudLastSyncedAt.value = null
+      return null
+    }
+
+    state.currentResumeId.value = active.id
+    loadData(active.data)
+    state.cloudConflict.value = null
+    state.cloudLastSyncedAt.value = getCloudUpdatedAt(active)
+    await loadResumes()
+    return active
+  }
+
+  async function resolveConflictWithLocal(name?: string) {
+    const userId = requireUserId(state)
+    const data = getData()
+    const resume = state.currentResumeId.value
+      ? await api.updateResume(state.currentResumeId.value, data)
+      : await api.createResume(userId, name ?? '当前简历', data)
+
+    state.currentResumeId.value = resume.id
+    state.cloudConflict.value = null
+    state.cloudLastSyncedAt.value = getCloudUpdatedAt(resume)
+    await loadResumes()
+    return resume
+  }
+
   return {
     login,
     register,
@@ -138,5 +232,7 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
     createNewVersion,
     switchVersion,
     removeVersion,
+    resolveConflictWithCloud,
+    resolveConflictWithLocal,
   }
 }

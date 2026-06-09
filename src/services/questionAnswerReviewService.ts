@@ -1,3 +1,4 @@
+import { extractJsonPayload, streamChatCompletion } from '@/services/aiClient'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { PracticeMastery, Question } from '@/stores/questionBank'
 
@@ -24,27 +25,6 @@ interface ReviewAnswerInput {
   answerDraft: string
   notes?: string
   mastery?: PracticeMastery
-}
-
-function normalizeApiUrl(raw: string): string {
-  let baseUrl = raw.trim().replace(/\/+$/, '')
-  if (!baseUrl.includes('/v1/chat/completions')) {
-    if (!baseUrl.endsWith('/v1')) {
-      baseUrl += '/v1'
-    }
-    baseUrl += '/chat/completions'
-  }
-  return baseUrl
-}
-
-function extractJsonPayload(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fenced?.[1]) return fenced[1].trim()
-
-  const first = raw.indexOf('{')
-  const last = raw.lastIndexOf('}')
-  if (first >= 0 && last > first) return raw.slice(first, last + 1).trim()
-  return raw.trim()
 }
 
 function clampScore(value: unknown): number {
@@ -138,71 +118,21 @@ export async function reviewQuestionAnswer(
   }
 
   try {
-    const response = await fetch(normalizeApiUrl(config.apiUrl), {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${config.apiToken}`,
-      },
-      body: JSON.stringify({
-        model: config.modelName,
-        messages: [
-          {
-            role: 'system',
-            content: '你是一个只输出 JSON 的面试回答点评助手。',
-          },
-          {
-            role: 'user',
-            content: buildPrompt(input),
-          },
-        ],
-        stream: true,
-      }),
+    const fullText = await streamChatCompletion({
+      config,
+      messages: [
+        {
+          role: 'system',
+          content: '你是一个只输出 JSON 的面试回答点评助手。',
+        },
+        {
+          role: 'user',
+          content: buildPrompt(input),
+        },
+      ],
       signal,
+      onChunk: callbacks.onChunk,
     })
-
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => '')
-      callbacks.onError(`API 请求失败 (${response.status}): ${errorText || response.statusText}`)
-      return
-    }
-
-    const reader = response.body?.getReader()
-    if (!reader) {
-      callbacks.onError('无法读取 AI 响应流')
-      return
-    }
-
-    const decoder = new TextDecoder()
-    let fullText = ''
-    let buffer = ''
-
-    while (true) {
-      const { done, value } = await reader.read()
-      if (done) break
-
-      buffer += decoder.decode(value, { stream: true })
-      const lines = buffer.split('\n')
-      buffer = lines.pop() ?? ''
-
-      for (const line of lines) {
-        const trimmed = line.trim()
-        if (!trimmed || !trimmed.startsWith('data:')) continue
-
-        const data = trimmed.slice(5).trim()
-        if (data === '[DONE]') continue
-
-        try {
-          const parsed = JSON.parse(data)
-          const content = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.message?.content
-          if (!content) continue
-          fullText += content
-          callbacks.onChunk(fullText)
-        } catch {
-          // Ignore malformed chunks.
-        }
-      }
-    }
 
     const normalized = normalizeReviewResult(JSON.parse(extractJsonPayload(fullText)))
     if (!normalized) {

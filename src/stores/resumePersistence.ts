@@ -9,8 +9,10 @@ import type {
 } from './resume'
 
 type ValueRef<T> = { value: T }
+export const RESUME_DRAFT_SCHEMA_VERSION = 1
 
 export interface ResumeDraftData {
+  schemaVersion: typeof RESUME_DRAFT_SCHEMA_VERSION
   modules: ModuleConfig[]
   selectedTemplateKey: ResumeTemplateKey
   basicInfo: BasicInfo
@@ -23,7 +25,8 @@ export interface ResumeDraftData {
   selfIntro: string
 }
 
-interface LegacyResumeDraftData extends Partial<ResumeDraftData> {
+type LegacyResumeDraftData = Partial<Omit<ResumeDraftData, 'schemaVersion'>> & {
+  schemaVersion?: unknown
   selectedTemplateId?: unknown
 }
 
@@ -64,6 +67,7 @@ function extractModuleKey(value: unknown): string | null {
 
 export function createResumeDataSnapshot(state: ResumeMutableState): ResumeDraftData {
   return {
+    schemaVersion: RESUME_DRAFT_SCHEMA_VERSION,
     modules: state.modules.map(cloneModuleConfig),
     selectedTemplateKey: state.selectedTemplateKey.value,
     basicInfo: { ...state.basicInfo },

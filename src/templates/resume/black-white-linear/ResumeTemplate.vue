@@ -91,7 +91,7 @@ const extraLinks = computed(() => {
           <span>{{ work.position || '岗位未填写' }}</span>
           <span v-if="work.location">{{ work.location }}</span>
         </p>
-        <div v-if="work.description" class="entry-rich" v-html="work.description"></div>
+        <div v-if="work.description" class="entry-rich" v-safe-html="work.description"></div>
       </article>
     </section>
 
@@ -116,11 +116,11 @@ const extraLinks = computed(() => {
         </p>
         <div v-if="project.introduction">
           <p class="project-block-title">项目介绍</p>
-          <div class="entry-rich" v-html="project.introduction"></div>
+          <div class="entry-rich" v-safe-html="project.introduction"></div>
         </div>
         <div v-if="project.mainWork">
           <p class="project-block-title">主要工作</p>
-          <div class="entry-rich" v-html="project.mainWork"></div>
+          <div class="entry-rich" v-safe-html="project.mainWork"></div>
         </div>
       </article>
     </section>
@@ -143,13 +143,13 @@ const extraLinks = computed(() => {
           </span>
           <span v-if="edu.location">{{ edu.location }}</span>
         </p>
-        <div v-if="edu.description" class="entry-rich" v-html="edu.description"></div>
+        <div v-if="edu.description" class="entry-rich" v-safe-html="edu.description"></div>
       </article>
     </section>
 
     <section v-if="store.isModuleVisible('skills') && store.skills" class="resume-section" :style="moduleOrderStyle('skills')">
       <h2 class="section-title">专业技能</h2>
-      <div class="entry-rich" v-html="store.skills"></div>
+      <div class="entry-rich" v-safe-html="store.skills"></div>
     </section>
 
     <section
@@ -163,7 +163,7 @@ const extraLinks = computed(() => {
           <p class="entry-main"><strong>{{ award.name }}</strong></p>
           <span class="entry-date">{{ award.date }}</span>
         </div>
-        <div v-if="award.description" class="entry-rich" v-html="award.description"></div>
+        <div v-if="award.description" class="entry-rich" v-safe-html="award.description"></div>
       </article>
     </section>
 
@@ -173,7 +173,7 @@ const extraLinks = computed(() => {
       :style="moduleOrderStyle('selfIntro')"
     >
       <h2 class="section-title">其他</h2>
-      <div class="entry-rich" v-html="store.selfIntro"></div>
+      <div class="entry-rich" v-safe-html="store.selfIntro"></div>
     </section>
 
     <div v-if="!hasAnyContent" class="empty">

@@ -13,6 +13,7 @@ import {
   createResumeDataSnapshot,
   loadResumeDataFromStorage,
   normalizeModuleConfigs,
+  RESUME_DRAFT_SCHEMA_VERSION,
   saveResumeDataToStorage,
   type KeyValueStorage,
   type ResumeMutableState,
@@ -230,6 +231,7 @@ describe('resumePersistence', () => {
 
     expect(error).toBeNull()
     expect(data).toEqual({
+      schemaVersion: RESUME_DRAFT_SCHEMA_VERSION,
       modules: fallbackModules,
       selectedTemplateKey: 'default',
       basicInfo: expect.objectContaining({ name: 'Alice' }),

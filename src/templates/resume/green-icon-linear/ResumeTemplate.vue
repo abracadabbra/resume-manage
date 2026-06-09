@@ -124,7 +124,7 @@ function projectHref(link: string): string {
           <span class="section-divider"></span>
         </h2>
         <div class="section-card">
-          <div class="entry-rich" v-html="store.selfIntro"></div>
+          <div class="entry-rich" v-safe-html="store.selfIntro"></div>
         </div>
       </section>
 
@@ -158,7 +158,7 @@ function projectHref(link: string): string {
             <p v-if="joinMeta([edu.major, edu.degree, edu.type, edu.college, edu.location, edu.gpa ? `GPA ${edu.gpa}` : ''])" class="entry-subline">
               {{ joinMeta([edu.major, edu.degree, edu.type, edu.college, edu.location, edu.gpa ? `GPA ${edu.gpa}` : '']) }}
             </p>
-            <div v-if="edu.description" class="entry-rich" v-html="edu.description"></div>
+            <div v-if="edu.description" class="entry-rich" v-safe-html="edu.description"></div>
           </article>
         </div>
       </section>
@@ -179,7 +179,7 @@ function projectHref(link: string): string {
           <span class="section-divider"></span>
         </h2>
         <div class="section-card">
-          <div class="entry-rich" v-html="store.skills"></div>
+          <div class="entry-rich" v-safe-html="store.skills"></div>
         </div>
       </section>
 
@@ -216,7 +216,7 @@ function projectHref(link: string): string {
                 <span v-if="work.location" class="entry-location">{{ work.location }}</span>
               </div>
             </div>
-            <div v-if="work.description" class="entry-rich" v-html="work.description"></div>
+            <div v-if="work.description" class="entry-rich" v-safe-html="work.description"></div>
           </article>
         </div>
       </section>
@@ -256,11 +256,11 @@ function projectHref(link: string): string {
             </p>
             <div v-if="project.introduction">
               <p class="project-block-title">项目介绍</p>
-              <div class="entry-rich" v-html="project.introduction"></div>
+              <div class="entry-rich" v-safe-html="project.introduction"></div>
             </div>
             <div v-if="project.mainWork">
               <p class="project-block-title">主要工作</p>
-              <div class="entry-rich" v-html="project.mainWork"></div>
+              <div class="entry-rich" v-safe-html="project.mainWork"></div>
             </div>
           </article>
         </div>
@@ -293,7 +293,7 @@ function projectHref(link: string): string {
               </p>
               <span class="entry-date">{{ award.date }}</span>
             </div>
-            <div v-if="award.description" class="entry-rich" v-html="award.description"></div>
+            <div v-if="award.description" class="entry-rich" v-safe-html="award.description"></div>
           </article>
         </div>
       </section>

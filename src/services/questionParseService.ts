@@ -1,5 +1,7 @@
 import questionBankData from '@/data/interview-questions.json'
 import { buildResumeDigest, type ResumeSnapshot } from '@/services/interviewService'
+import { extractJsonPayload, streamChatCompletion } from '@/services/aiClient'
+export { extractJsonPayload } from '@/services/aiClient'
 import type { ProjectEntry } from '@/stores/resume'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import type { QuestionDraft } from '@/stores/questionBank'
@@ -71,27 +73,6 @@ const ALLOWED_LABELS = new Set([
 export const CHAPTERS_CONTEXT = chapterList
   .map((chapter) => `${chapter.id}: ${chapter.name}`)
   .join('\n')
-
-function normalizeApiUrl(raw: string): string {
-  let baseUrl = raw.trim().replace(/\/+$/, '')
-  if (!baseUrl.includes('/v1/chat/completions')) {
-    if (!baseUrl.endsWith('/v1')) {
-      baseUrl += '/v1'
-    }
-    baseUrl += '/chat/completions'
-  }
-  return baseUrl
-}
-
-export function extractJsonPayload(raw: string): string {
-  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/i)
-  if (fenced?.[1]) return fenced[1].trim()
-
-  const first = raw.indexOf('{')
-  const last = raw.lastIndexOf('}')
-  if (first >= 0 && last > first) return raw.slice(first, last + 1).trim()
-  return raw.trim()
-}
 
 function normalizeDifficulty(value: unknown): Difficulty {
   if (typeof value !== 'string') return 'intermediate'
@@ -190,65 +171,19 @@ export async function streamChatJson(
     throw new Error('请先在设置中配置 AI API')
   }
 
-  const response = await fetch(normalizeApiUrl(config.apiUrl), {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${config.apiToken}`,
+  return streamChatCompletion({
+    config: {
+      apiUrl: config.apiUrl,
+      apiToken: config.apiToken,
+      modelName: config.modelName || 'gpt-4o-mini',
     },
-    body: JSON.stringify({
-      model: config.modelName || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-      stream: true,
-    }),
+    messages: [
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userMessage },
+    ],
     signal,
+    onChunk,
   })
-
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '')
-    throw new Error(`API 请求失败 (${response.status}): ${errorText || response.statusText}`)
-  }
-
-  const reader = response.body?.getReader()
-  if (!reader) {
-    throw new Error('无法读取 API 响应流')
-  }
-
-  const decoder = new TextDecoder()
-  let fullText = ''
-  let buffer = ''
-
-  while (true) {
-    const { done, value } = await reader.read()
-    if (done) break
-
-    buffer += decoder.decode(value, { stream: true })
-    const lines = buffer.split('\n')
-    buffer = lines.pop() ?? ''
-
-    for (const line of lines) {
-      const trimmed = line.trim()
-      if (!trimmed || !trimmed.startsWith('data:')) continue
-
-      const data = trimmed.slice(5).trim()
-      if (data === '[DONE]') continue
-
-      try {
-        const parsed = JSON.parse(data)
-        const content = parsed.choices?.[0]?.delta?.content ?? parsed.choices?.[0]?.message?.content
-        if (!content) continue
-        fullText += content
-        onChunk(fullText)
-      } catch {
-        // Ignore malformed streaming chunks.
-      }
-    }
-  }
-
-  return fullText
 }
 
 function buildParseQuestionPrompt() {

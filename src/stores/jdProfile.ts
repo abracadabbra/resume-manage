@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import defaultQuestions from '@/data/jd-default-questions.json'
+import { loadJson, saveJson } from '@/services/safeStorage'
 
 export interface JdQuestion {
   id: string
@@ -26,20 +27,11 @@ const STORAGE_KEY = 'jd-profiles'
 let jdQuestionIdCounter = 0
 
 function loadProfiles(): JdProfile[] {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    return stored ? JSON.parse(stored) : []
-  } catch {
-    return []
-  }
+  return loadJson<JdProfile[]>(localStorage, STORAGE_KEY, []).value
 }
 
 function saveProfiles(profiles: JdProfile[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(profiles))
-  } catch {
-    // ignore
-  }
+  saveJson(localStorage, STORAGE_KEY, profiles)
 }
 
 function createJdQuestionId(): string {
