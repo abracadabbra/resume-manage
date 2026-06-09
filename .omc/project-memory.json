@@ -43,7 +43,7 @@
   },
   "build": {
     "buildCommand": "npm run build",
-    "testCommand": null,
+    "testCommand": "cd \"/Users/shentao/Library/Mobile Documents/com~apple~CloudDocs/其他/resume-builder-main\" && git add vitest.config.ts && git commit -m \"$(cat <<'EOF'\nchore: 添加 vitest 配置文件\n\nCo-Authored-By: Claude Opus 4.7 <noreply@anthropic.com>\nEOF\n)\"",
     "lintCommand": "npm run lint",
     "devCommand": "npm run dev",
     "scripts": {
