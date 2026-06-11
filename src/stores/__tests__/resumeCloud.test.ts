@@ -285,26 +285,63 @@ describe('resumeCloud', () => {
     state.isLoggedIn.value = true
     state.userId.value = 'user-1'
     state.currentResumeId.value = 'resume-a'
-    const resumeB = createResumeRecord('resume-b', { is_active: true })
+    const resumeB = createResumeRecord('resume-b', {
+      is_active: true,
+      data: { basicInfo: { name: 'Version B' } },
+    })
     const api = createApi({
       getResumes: vi.fn().mockResolvedValue([resumeB]),
       getActiveResume: vi.fn().mockResolvedValue(resumeB),
     })
+    const loadData = vi.fn()
 
     const manager = createResumeCloudManager({
       api,
       state,
       getData: () => ({}),
-      loadData: vi.fn(),
+      loadData,
     })
 
     await manager.switchVersion('resume-b')
     expect(api.setActiveResume).toHaveBeenCalledWith('user-1', 'resume-b')
     expect(state.currentResumeId.value).toBe('resume-b')
+    expect(loadData).toHaveBeenCalledWith(resumeB.data)
 
     await manager.removeVersion('resume-b')
     expect(api.deleteResume).toHaveBeenCalledWith('resume-b')
     expect(state.currentResumeId.value).toBe('resume-b')
+  })
+
+  it('loads switched version data even when local edits exist', async () => {
+    const state = createState()
+    state.isLoggedIn.value = true
+    state.userId.value = 'user-1'
+    state.currentResumeId.value = 'resume-a'
+    state.cloudLastSyncedAt.value = 200
+    const resumeB = createResumeRecord('resume-b', {
+      is_active: true,
+      updated_at: new Date(100).toISOString(),
+      data: { basicInfo: { name: 'Version B' } },
+    })
+    const api = createApi({
+      getResumes: vi.fn().mockResolvedValue([resumeB]),
+      getActiveResume: vi.fn().mockResolvedValue(resumeB),
+    })
+    const loadData = vi.fn()
+
+    const manager = createResumeCloudManager({
+      api,
+      state,
+      getData: () => ({ basicInfo: { name: 'Local Draft' } }),
+      loadData,
+      getLocalUpdatedAt: () => 300,
+    })
+
+    await manager.switchVersion('resume-b')
+
+    expect(loadData).toHaveBeenCalledWith(resumeB.data)
+    expect(state.cloudConflict.value).toBeNull()
+    expect(state.cloudLastSyncedAt.value).toBe(100)
   })
 
   it('throws when saving to cloud without login', async () => {

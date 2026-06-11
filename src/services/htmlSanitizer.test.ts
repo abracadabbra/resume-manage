@@ -33,4 +33,26 @@ describe('htmlSanitizer', () => {
 
     expect(result).toBe('<h2>标题</h2><pre><code>const a = 1</code></pre><table><tbody><tr><td>值</td></tr></tbody></table>')
   })
+
+  // AI Generated Start
+  it('unwraps legacy font tags produced by execCommand before RichEditor converts them', () => {
+    const result = sanitizeHtml('<font size="7" color="#ff0000">项目描述</font>')
+
+    expect(result).toBe('项目描述')
+  })
+
+  it('preserves span-based font size and color used by RichEditor', () => {
+    const result = sanitizeHtml(
+      '<span style="font-size: 14px; color: #ff0000">项目描述</span>',
+    )
+
+    expect(result).toBe('<span style="font-size: 14px; color: #ff0000">项目描述</span>')
+  })
+
+  it('preserves rgb color values from browser inline styles', () => {
+    const result = sanitizeHtml('<span style="color: rgb(255, 0, 0)">项目描述</span>')
+
+    expect(result).toBe('<span style="color: rgb(255, 0, 0)">项目描述</span>')
+  })
+  // AI Generated End
 })

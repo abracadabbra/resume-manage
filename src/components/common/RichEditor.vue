@@ -16,6 +16,9 @@ const editorRef = ref<HTMLDivElement | null>(null)
 const isFocused = ref(false)
 const showPlaceholder = ref(!props.modelValue)
 const savedSelection = ref<Range | null>(null)
+// AI Generated Start
+const isApplyingFormat = ref(false)
+// AI Generated End
 
 // Sync incoming model value → DOM (only when not focused to avoid cursor jumps)
 watch(() => props.modelValue, (val) => {
@@ -35,9 +38,9 @@ onMounted(() => {
   }
 })
 
-function onInput() {
+// AI Generated Start
+function syncEditorContent() {
   const html = editorRef.value?.innerHTML ?? ''
-  // Treat empty div as empty string
   const sanitized = sanitizeHtml(html)
   if (editorRef.value && editorRef.value.innerHTML !== sanitized) {
     editorRef.value.innerHTML = sanitized
@@ -45,6 +48,22 @@ function onInput() {
   const clean = sanitized === '<br>' || sanitized === '<div><br></div>' ? '' : sanitized
   showPlaceholder.value = !clean
   emit('update:modelValue', clean)
+}
+
+function runWithFormatGuard(action: () => void) {
+  isApplyingFormat.value = true
+  try {
+    action()
+  } finally {
+    isApplyingFormat.value = false
+    syncEditorContent()
+  }
+}
+// AI Generated End
+
+function onInput() {
+  if (isApplyingFormat.value) return
+  syncEditorContent()
 }
 
 function isSelectionInsideEditor(selection: Selection) {
@@ -80,40 +99,78 @@ function ensureEditorSelection() {
 }
 
 function execCmd(cmd: string, value?: string) {
-  ensureEditorSelection()
-  document.execCommand(cmd, false, value)
-  saveSelection()
-  editorRef.value?.focus()
-  onInput()
+  runWithFormatGuard(() => {
+    ensureEditorSelection()
+    document.execCommand(cmd, false, value)
+    saveSelection()
+    editorRef.value?.focus()
+  })
 }
 
 function setFontSize(e: Event) {
   const size = (e.target as HTMLSelectElement).value
-  ensureEditorSelection()
-  // execCommand fontSize uses 1-7 scale; we use a span approach instead
-  document.execCommand('fontSize', false, '7')
-  const fontEls = editorRef.value?.querySelectorAll('font[size="7"]')
-  fontEls?.forEach(el => {
-    const span = document.createElement('span')
-    span.style.fontSize = size
-    span.innerHTML = sanitizeHtml(el.innerHTML)
-    el.parentNode?.replaceChild(span, el)
+  if (!size) return
+
+  runWithFormatGuard(() => {
+    ensureEditorSelection()
+    // execCommand fontSize uses 1-7 scale; we use a span approach instead
+    document.execCommand('fontSize', false, '7')
+    const fontEls = editorRef.value?.querySelectorAll('font[size="7"]')
+    fontEls?.forEach(el => {
+      const span = document.createElement('span')
+      span.style.fontSize = size
+      span.innerHTML = sanitizeHtml(el.innerHTML)
+      el.parentNode?.replaceChild(span, el)
+    })
+    // Keep list item marker size in sync with content size.
+    applyFontSizeToSelectedListItems(size)
+    saveSelection()
+    editorRef.value?.focus()
   })
-  // Keep list item marker size in sync with content size.
-  applyFontSizeToSelectedListItems(size)
-  editorRef.value?.focus()
-  onInput()
 }
 
+// AI Generated Start
 function normalizeForegroundColor(color: string) {
-  const fontEls = editorRef.value?.querySelectorAll(`font[color="${color}"]`)
+  const fontEls = editorRef.value?.querySelectorAll('font')
   fontEls?.forEach(el => {
     const span = document.createElement('span')
-    span.style.color = color
+    const fontColor = el.getAttribute('color') || (el as HTMLElement).style.color || color
+    span.style.color = fontColor
     span.innerHTML = sanitizeHtml(el.innerHTML)
     el.parentNode?.replaceChild(span, el)
   })
 }
+
+function applyTextColor(color: string) {
+  if (!editorRef.value) return
+
+  ensureEditorSelection()
+  const selection = window.getSelection()
+  if (!selection || selection.rangeCount === 0 || !isSelectionInsideEditor(selection)) return
+
+  const range = selection.getRangeAt(0)
+  if (range.collapsed) return
+
+  const span = document.createElement('span')
+  span.style.color = color
+
+  try {
+    range.surroundContents(span)
+  } catch {
+    const extracted = range.extractContents()
+    if (!extracted.textContent?.trim()) return
+    span.appendChild(extracted)
+    range.insertNode(span)
+  }
+
+  const nextRange = document.createRange()
+  nextRange.selectNodeContents(span)
+  nextRange.collapse(false)
+  selection.removeAllRanges()
+  selection.addRange(nextRange)
+  savedSelection.value = nextRange.cloneRange()
+}
+// AI Generated End
 
 function applyFontSizeToSelectedListItems(size: string) {
   const selection = window.getSelection()
@@ -155,12 +212,13 @@ function applyFontSizeToSelectedListItems(size: string) {
 
 function setColor(e: Event) {
   const color = (e.target as HTMLInputElement).value
-  ensureEditorSelection()
-  document.execCommand('foreColor', false, color)
-  normalizeForegroundColor(color)
-  saveSelection()
-  editorRef.value?.focus()
-  onInput()
+  if (!color) return
+
+  runWithFormatGuard(() => {
+    applyTextColor(color)
+    normalizeForegroundColor(color)
+    editorRef.value?.focus()
+  })
 }
 
 function handleFocus() {
@@ -203,7 +261,7 @@ function isActive(cmd: string): boolean {
         <option value="18px">18</option>
         <option value="20px">20</option>
       </select>
-      <input type="color" class="tool-color" @mousedown="saveSelection" @change="setColor" title="字体颜色" value="#333333" />
+      <input type="color" class="tool-color" @mousedown="saveSelection" @input="setColor" @change="setColor" title="字体颜色" value="#333333" />
       <div class="tool-divider"></div>
       <button type="button" class="tool-btn" @mousedown.prevent="execCmd('insertUnorderedList')" title="无序列表">
         <svg width="12" height="12" viewBox="0 0 16 16" fill="none">

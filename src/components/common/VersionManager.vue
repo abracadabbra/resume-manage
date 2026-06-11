@@ -162,11 +162,22 @@ async function handleCreateVersion() {
   }
 }
 
+// AI Generated Start
 async function handleSwitchVersion(resumeId: string) {
-  await store.switchVersion(resumeId)
-  compareLeftId.value = resumeId
-  emit('close')
+  error.value = ''
+  loading.value = true
+
+  try {
+    await store.switchVersion(resumeId)
+    compareLeftId.value = resumeId
+    emit('close')
+  } catch (e: unknown) {
+    error.value = e instanceof Error ? e.message : '切换版本失败'
+  } finally {
+    loading.value = false
+  }
 }
+// AI Generated End
 
 async function handleDeleteVersion(resumeId: string, event: Event) {
   event.stopPropagation()
@@ -254,6 +265,7 @@ function openCompareWith(resumeId: string, event: Event) {
       </div>
 
       <template v-if="viewMode === 'manage'">
+        <div v-if="error" class="error-msg manage-error">{{ error }}</div>
         <div class="version-list">
           <div
             v-for="resume in store.resumeVersions"
@@ -746,6 +758,14 @@ function openCompareWith(resumeId: string, event: Event) {
 .error-msg {
   color: #dc3545;
   font-size: 13px;
+}
+
+.manage-error {
+  margin-bottom: 12px;
+  padding: 10px 12px;
+  border: 1px solid #f5c2c7;
+  border-radius: 8px;
+  background: #fdf2f2;
 }
 
 .compare-toolbar {

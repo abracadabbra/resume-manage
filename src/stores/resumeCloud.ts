@@ -175,14 +175,26 @@ export function createResumeCloudManager(options: ResumeCloudManagerOptions) {
     await loadResumes()
   }
 
+  // AI Generated Start
   async function switchVersion(resumeId: string) {
     const userId = state.userId.value
     if (!userId) return
 
     await api.setActiveResume(userId, resumeId)
     state.currentResumeId.value = resumeId
-    await loadResumes()
+    state.resumeVersions.value = await api.getResumes(userId)
+
+    const target =
+      state.resumeVersions.value.find((resume) => resume.id === resumeId) ??
+      (await api.getActiveResume(userId))
+
+    if (!target) return
+
+    loadData(target.data)
+    state.cloudConflict.value = null
+    state.cloudLastSyncedAt.value = getCloudUpdatedAt(target)
   }
+  // AI Generated End
 
   async function removeVersion(resumeId: string) {
     await api.deleteResume(resumeId)
