@@ -13,9 +13,12 @@ const QuestionBankPanel = defineAsyncComponent(
 const JdSpecialPanel = defineAsyncComponent(
   () => import('@/components/jd-special/JdSpecialPanel.vue'),
 )
+const TechInterviewPanel = defineAsyncComponent(
+  () => import('@/components/tech-interview/TechInterviewPanel.vue'),
+)
 
 const sidebarCollapsed = ref(false)
-type PrimaryMenuKey = 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special'
+type PrimaryMenuKey = 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview'
 const activeMenu = ref<PrimaryMenuKey>('resume-editor')
 
 function handleSelectMenu(key: PrimaryMenuKey) {
@@ -38,6 +41,7 @@ function handleSelectMenu(key: PrimaryMenuKey) {
       </template>
       <QuestionBankPanel v-else-if="activeMenu === 'question-bank'" />
       <JdSpecialPanel v-else-if="activeMenu === 'jd-special'" />
+      <TechInterviewPanel v-else-if="activeMenu === 'tech-interview'" />
       <AiInterviewerPanel v-else />
     </div>
   </div>

@@ -7,7 +7,7 @@ import VersionManager from './VersionManager.vue'
 const props = withDefaults(
   defineProps<{
     collapsed?: boolean
-    activeMenu?: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special'
+    activeMenu?: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview'
   }>(),
   {
     collapsed: false,
@@ -17,7 +17,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'toggle-collapse'): void
-  (e: 'select-menu', key: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special'): void
+  (e: 'select-menu', key: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview'): void
 }>()
 
 const store = useResumeStore()
@@ -36,6 +36,12 @@ const primaryMenus = [
     label: '面试题库',
     iconPath:
       'M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253',
+  },
+  {
+    key: 'tech-interview' as const,
+    label: '大厂面经',
+    iconPath:
+      'M21 21l-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z',
   },
   {
     key: 'resume-editor' as const,
