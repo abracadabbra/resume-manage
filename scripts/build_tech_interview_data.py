@@ -149,6 +149,16 @@ def is_noise(question: str) -> bool:
         if not has_keyword:
             return True
 
+    # 7. 散文题：>300字 + 含对话词 + 无问号
+    if len(q) > 300 and '？' not in q and '?' not in q:
+        prose_markers = [
+            "然后", "接下来", "面试官说", "面试官问",
+            "他问", "她说", "他说", "我说", "我答", "我回答",
+            "我忘记", "记不清", "又开始",
+        ]
+        if sum(1 for m in prose_markers if m in q) >= 2:
+            return True
+
     return False
 
 
@@ -167,22 +177,110 @@ def main():
     questions_by_cat = {}
     categories_meta = []
 
+    # 第一步：所有分类写入到一个临时 list，再做全局跨分类去重
+    all_cats_buffer = {}
     for cat_name in CATEGORY_ORDER:
         if cat_name not in data:
             continue
         cat_data = data[cat_name]
+        all_cats_buffer[cat_name] = cat_data
+
+    # 软去重：≥90% 字符相同视为同一题（最长公共前缀比 ≥0.9）
+    def soft_same(a: str, b: str) -> bool:
+        if not a or not b:
+            return False
+        shorter, longer = (a, b) if len(a) <= len(b) else (b, a)
+        if len(shorter) < 4:
+            return False
+        # 计算前缀匹配
+        common = 0
+        for x, y in zip(shorter, longer):
+            if x != y:
+                break
+            common += 1
+        return common / len(shorter) >= 0.9 and common >= 8
+
+    norm_to_first_cat = {}
+    pending_items = []  # (cat_name, item, norm)
+
+    # 综合分类不参与"首选分类"，避免吃掉具体技术分类的题
+    GENERAL_CATS = {'项目与场景', '智力题与开放题', '其他'}
+
+    for cat_name in CATEGORY_ORDER:
+        if cat_name not in all_cats_buffer:
+            continue
+        if cat_name in GENERAL_CATS:
+            continue
+        cat_data = all_cats_buffer[cat_name]
+        for item in cat_data['questions']:
+            q_text = item['question']
+            if is_noise(q_text):
+                continue
+            norm = re.sub(r'[^一-鿿a-z]', '', q_text.lower())
+            if not norm:
+                continue
+            # 软匹配：若与已有任一 norm 90% 相同，复用其分类
+            existing = None
+            for k in norm_to_first_cat:
+                if soft_same(norm, k):
+                    existing = k
+                    break
+            if existing is None and norm not in norm_to_first_cat:
+                norm_to_first_cat[norm] = cat_name
+
+    # 只有当具体技术分类都没命中时才落到综合分类
+    for cat_name in CATEGORY_ORDER:
+        if cat_name not in all_cats_buffer:
+            continue
+        if cat_name not in GENERAL_CATS:
+            continue
+        cat_data = all_cats_buffer[cat_name]
+        for item in cat_data['questions']:
+            q_text = item['question']
+            if is_noise(q_text):
+                continue
+            norm = re.sub(r'[^一-鿿a-z]', '', q_text.lower())
+            if not norm:
+                continue
+            # 软匹配：若与已有任一 norm 90% 相同，复用其分类
+            existing = None
+            for k in norm_to_first_cat:
+                if soft_same(norm, k):
+                    existing = k
+                    break
+            if existing is None and norm not in norm_to_first_cat:
+                norm_to_first_cat[norm] = cat_name
+
+    for cat_name in CATEGORY_ORDER:
+        if cat_name not in all_cats_buffer:
+            continue
+        cat_data = all_cats_buffer[cat_name]
         cat_id = CATEGORY_ID_MAP.get(cat_name, cat_name)
 
         clean_qs = []
         for item in cat_data['questions']:
             total_raw += 1
             q_text = item['question']
-
             if is_noise(q_text):
                 total_cleaned += 1
                 continue
 
-            # 收集公司
+            norm = re.sub(r'[^一-鿿a-z]', '', q_text.lower())
+            # 仅当此分类是该 norm 的"首选分类"时保留（软匹配）
+            primary_cat = None
+            for k, c in norm_to_first_cat.items():
+                if soft_same(norm, k) or k == norm:
+                    primary_cat = c
+                    break
+            if primary_cat != cat_name:
+                continue
+
+            # 截断题黑名单（仅硬黑名单，避免误伤合理短题）
+            TRUNC_BLACKLIST = ['HashMap和ConcurrentHashMap的区']
+            if any(b in q_text for b in TRUNC_BLACKLIST):
+                total_cleaned += 1
+                continue
+
             for company in item.get('companies', []):
                 all_companies.add(company)
 
@@ -192,9 +290,7 @@ def main():
                 'c': item.get('companies', []),
             })
 
-        # 按频次降序排序
         clean_qs.sort(key=lambda x: -x['f'])
-
         questions_by_cat[cat_id] = clean_qs
         categories_meta.append({
             'id': cat_id,
