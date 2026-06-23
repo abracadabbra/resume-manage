@@ -53,7 +53,10 @@ function handleKeydown(e: KeyboardEvent) {
 <style scoped>
 .tech-interview-panel {
   display: flex;
+  flex: 1;
   height: 100%;
+  min-width: 0;
+  overflow: hidden;
   background: #faf8f5;
 }
 

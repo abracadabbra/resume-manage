@@ -1,4 +1,4 @@
-import type { PracticeRecord, Question } from '@/stores/questionBank'
+import type { PracticeRecord, Question, AiAnswerData } from '@/stores/questionBank'
 import {
   createSyncConflict,
   decideSyncDecision,
@@ -8,9 +8,10 @@ import {
 type ValueRef<T> = { value: T }
 
 export interface QuestionBankCloudData {
-  schemaVersion: 1
+  schemaVersion: 1 | 2
   addedQuestions: Question[]
   practiceRecords: Record<string, PracticeRecord>
+  aiAnswers: Record<string, AiAnswerData>
   updatedAt: number
 }
 

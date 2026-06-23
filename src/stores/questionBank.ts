@@ -10,6 +10,7 @@ import {
   upsertQuestionBankState,
 } from '@/services/supabase'
 import { loadJson, saveJson } from '@/services/safeStorage'
+import type { ChatMessage } from '@/services/aiClient'
 import {
   createQuestionBankCloudManager,
   type QuestionBankCloudData,
@@ -75,6 +76,7 @@ interface QuestionBankDataset {
 
 const STORAGE_KEY = 'question-bank-added-questions'
 const PRACTICE_STORAGE_KEY = 'question-bank-practice-records'
+const AI_ANSWERS_STORAGE_KEY = 'question-bank-ai-answers'
 const QUESTION_BANK_LOCAL_SCHEMA_VERSION = 1
 const AI_GENERATED_SOURCES: QuestionSource[] = ['resume-generated', 'project-generated', 'interview-review']
 
@@ -86,6 +88,17 @@ interface AddedQuestionsStorageData {
 interface PracticeRecordsStorageData {
   schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
   records: Record<string, PracticeRecord>
+}
+
+interface AiAnswersStorageData {
+  schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
+  answers: Record<string, AiAnswerData>
+}
+
+export interface AiAnswerData {
+  answer: string
+  conversations: ChatMessage[]
+  updatedAt: number
 }
 
 function clampScore(value: unknown): number {
@@ -218,6 +231,58 @@ function savePracticeRecords(records: Record<string, PracticeRecord>) {
   } satisfies PracticeRecordsStorageData)
 }
 
+function loadAiAnswers(): Record<string, AiAnswerData> {
+  const value = loadJson<AiAnswersStorageData | Record<string, AiAnswerData>>(
+    localStorage,
+    AI_ANSWERS_STORAGE_KEY,
+    {},
+  ).value
+  const answers =
+    value && typeof value === 'object' && !Array.isArray(value) && 'answers' in value
+      ? value.answers
+      : value
+  return normalizeAiAnswers(answers)
+}
+
+function saveAiAnswers(answers: Record<string, AiAnswerData>) {
+  saveJson(localStorage, AI_ANSWERS_STORAGE_KEY, {
+    schemaVersion: QUESTION_BANK_LOCAL_SCHEMA_VERSION,
+    answers,
+  } satisfies AiAnswersStorageData)
+}
+
+function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+  const record = input as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries(record).map(([questionId, data]) => [
+      questionId,
+      normalizeAiAnswerData(data),
+    ]),
+  )
+}
+
+function normalizeAiAnswerData(input: unknown): AiAnswerData {
+  if (!input || typeof input !== 'object') {
+    return { answer: '', conversations: [], updatedAt: 0 }
+  }
+  const data = input as Partial<AiAnswerData>
+  return {
+    answer: String(data.answer ?? ''),
+    conversations: Array.isArray(data.conversations) ? data.conversations : [],
+    updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
+  }
+}
+
+function cloneAiAnswers(answers: Record<string, AiAnswerData>): Record<string, AiAnswerData> {
+  return Object.fromEntries(
+    Object.entries(answers).map(([questionId, data]) => [
+      questionId,
+      { ...data, conversations: [...data.conversations] },
+    ]),
+  )
+}
+
 async function loadBundledQuestionBankData(): Promise<QuestionBankDataset> {
   const module = await import('@/data/interview-questions.json')
   return module.default as QuestionBankDataset
@@ -284,6 +349,22 @@ function mergePracticeRecords(
   return merged
 }
 
+function mergeAiAnswers(
+  localAnswers: Record<string, AiAnswerData>,
+  cloudAnswers: Record<string, AiAnswerData>,
+): Record<string, AiAnswerData> {
+  const merged = cloneAiAnswers(localAnswers)
+
+  Object.entries(cloudAnswers).forEach(([questionId, cloudData]) => {
+    const localData = merged[questionId]
+    if (!localData || cloudData.updatedAt >= localData.updatedAt) {
+      merged[questionId] = cloudData
+    }
+  })
+
+  return merged
+}
+
 function normalizeCloudAddedQuestions(input: unknown): Question[] {
   if (!Array.isArray(input)) return []
   return input
@@ -309,6 +390,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
   const isLoaded = ref(false)
   const loadError = ref('')
   const practiceRecords = ref<Record<string, PracticeRecord>>(loadPracticeRecords())
+  const aiAnswers = ref<Record<string, AiAnswerData>>(loadAiAnswers())
   const cloudSyncStatus = ref<'idle' | 'pulling' | 'pushing'>('idle')
   const cloudSyncError = ref('')
   const cloudLastSyncedAt = ref<number | null>(null)
@@ -323,6 +405,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
       schemaVersion: 1,
       addedQuestions: addedQuestions.value.map((item) => ({ ...item })),
       practiceRecords: clonePracticeRecords(practiceRecords.value),
+      aiAnswers: cloneAiAnswers(aiAnswers.value),
       updatedAt: getQuestionBankUpdatedAt(addedQuestions.value, practiceRecords.value),
     }
   }
@@ -340,8 +423,12 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
       practiceRecords.value,
       normalizePracticeRecords(data.practiceRecords),
     )
+    if (data.aiAnswers) {
+      aiAnswers.value = mergeAiAnswers(aiAnswers.value, normalizeAiAnswers(data.aiAnswers))
+    }
     saveAddedQuestions(addedQuestions.value)
     savePracticeRecords(practiceRecords.value)
+    saveAiAnswers(aiAnswers.value)
   }
 
   const cloudManager = createQuestionBankCloudManager({
@@ -379,6 +466,18 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
       if (practiceSaveTimer) clearTimeout(practiceSaveTimer)
       practiceSaveTimer = setTimeout(() => {
         savePracticeRecords(practiceRecords.value)
+      }, 500)
+    },
+    { deep: true },
+  )
+
+  let aiAnswersSaveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    aiAnswers,
+    () => {
+      if (aiAnswersSaveTimer) clearTimeout(aiAnswersSaveTimer)
+      aiAnswersSaveTimer = setTimeout(() => {
+        saveAiAnswers(aiAnswers.value)
       }, 500)
     },
     { deep: true },
@@ -590,6 +689,19 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
     return practiceRecords.value[questionId] ?? createEmptyPracticeRecord()
   }
 
+  function getAiAnswerData(questionId: string): AiAnswerData | null {
+    return aiAnswers.value[questionId] ?? null
+  }
+
+  function saveAiAnswerData(questionId: string, data: AiAnswerData) {
+    aiAnswers.value = { ...aiAnswers.value, [questionId]: data }
+  }
+
+  function clearAiAnswerData(questionId: string) {
+    const { [questionId]: _removed, ...rest } = aiAnswers.value
+    aiAnswers.value = rest
+  }
+
   function upsertPracticeRecord(questionId: string, updates: Partial<Omit<PracticeRecord, 'updatedAt'>>) {
     const current = getPracticeRecord(questionId)
     const nextMastery =
@@ -725,6 +837,7 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
     isLoaded,
     loadError,
     practiceRecords,
+    aiAnswers,
     cloudSyncStatus,
     cloudSyncError,
     cloudLastSyncedAt,
@@ -759,6 +872,9 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
     batchSetPracticeMastery,
     savePracticeAiReview,
     isQuestionReviewCandidate,
+    getAiAnswerData,
+    saveAiAnswerData,
+    clearAiAnswerData,
     ensureBundledQuestionsLoaded,
     pushToCloud: cloudManager.pushToCloud,
     pullFromCloud: cloudManager.pullFromCloud,

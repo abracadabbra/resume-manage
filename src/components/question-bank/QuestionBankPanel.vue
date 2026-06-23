@@ -132,6 +132,7 @@ function buildInterviewPrepContent() {
     questions: exportQuestions.value,
     chapters: store.chapters,
     practiceRecords: store.practiceRecords,
+    aiAnswers: store.aiAnswers,
   })
 }
 

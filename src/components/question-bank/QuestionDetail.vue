@@ -11,11 +11,14 @@ import {
   type FollowUpDrillPlan,
 } from '@/services/questionFollowUpDrillService'
 import { reviewQuestionAnswer } from '@/services/questionAnswerReviewService'
+import { generateQuestionAnswer } from '@/services/questionAnswerGenerationService'
+import type { ChatMessage } from '@/services/aiClient'
 import QuestionDrillPanel from './QuestionDrillPanel.vue'
 import QuestionFollowUpList from './QuestionFollowUpList.vue'
 import QuestionHeader from './QuestionHeader.vue'
 import QuestionPracticePanel from './QuestionPracticePanel.vue'
 import QuestionReferenceAnswer from './QuestionReferenceAnswer.vue'
+import QuestionAiAnswer from './QuestionAiAnswer.vue'
 
 const store = useQuestionBankStore()
 const aiConfig = useAiConfigStore()
@@ -46,6 +49,25 @@ const drillPlan = ref<FollowUpDrillPlan | null>(null)
 const drillRoundIndex = ref(0)
 const drillAnswers = ref<string[]>([])
 let drillAbortController: AbortController | null = null
+
+const isGeneratingAiAnswer = ref(false)
+const aiAnswerError = ref('')
+const aiAnswerStreamingText = ref('')
+const currentAiConversations = ref<ChatMessage[]>([])
+let aiAnswerAbortController: AbortController | null = null
+
+// Sync conversations when switching to a question that already has cached data
+watch(
+  () => store.selectedQuestionId,
+  (id) => {
+    if (id) {
+      const cached = store.getAiAnswerData(id)
+      currentAiConversations.value = cached?.conversations ?? []
+    } else {
+      currentAiConversations.value = []
+    }
+  },
+)
 
 const currentPracticeRecord = computed(() => {
   if (!store.selectedQuestionId) {
@@ -132,6 +154,11 @@ const drillHintText = computed(() => {
   return '当前题目的内置追问不足 3 轮，配置 AI 后可自动生成完整追问链。'
 })
 
+const currentAiAnswerData = computed(() => {
+  if (!store.selectedQuestionId) return null
+  return store.getAiAnswerData(store.selectedQuestionId)
+})
+
 function handleSetMastery(mastery: PracticeMastery) {
   if (!store.selectedQuestionId) return
   store.setPracticeMastery(store.selectedQuestionId, mastery)
@@ -156,6 +183,15 @@ function resetDrillState() {
   drillPlan.value = null
   drillRoundIndex.value = 0
   drillAnswers.value = []
+}
+
+function resetAiAnswerState() {
+  aiAnswerAbortController?.abort()
+  aiAnswerAbortController = null
+  isGeneratingAiAnswer.value = false
+  aiAnswerError.value = ''
+  aiAnswerStreamingText.value = ''
+  currentAiConversations.value = []
 }
 
 function startDrillPlan(plan: FollowUpDrillPlan) {
@@ -247,6 +283,7 @@ watch(
   () => store.selectedQuestionId,
   () => {
     resetDrillState()
+    resetAiAnswerState()
   },
 )
 
@@ -280,6 +317,100 @@ async function handleReviewAnswer() {
     },
     reviewAbortController.signal,
   )
+}
+
+function cancelAiAnswerGeneration() {
+  aiAnswerAbortController?.abort()
+  resetAiAnswerState()
+}
+
+async function handleGenerateAiAnswer() {
+  if (!store.selectedQuestion || !store.selectedQuestionId) return
+
+  isGeneratingAiAnswer.value = true
+  aiAnswerError.value = ''
+  aiAnswerStreamingText.value = ''
+  aiAnswerAbortController = new AbortController()
+
+  await generateQuestionAnswer(
+    {
+      question: store.selectedQuestion,
+      conversation: currentAiConversations.value,
+    },
+    {
+      onChunk(text) {
+        aiAnswerStreamingText.value = text
+      },
+      onDone(answer) {
+        const conversations = [
+          ...currentAiConversations.value,
+          { role: 'assistant' as const, content: answer },
+        ]
+        store.saveAiAnswerData(store.selectedQuestionId!, {
+          answer,
+          conversations,
+          updatedAt: Date.now(),
+        })
+        isGeneratingAiAnswer.value = false
+        aiAnswerAbortController = null
+      },
+      onError(error) {
+        aiAnswerError.value = error
+        isGeneratingAiAnswer.value = false
+        aiAnswerAbortController = null
+      },
+    },
+    aiAnswerAbortController.signal,
+  )
+}
+
+async function handleAiFollowUp(text: string) {
+  if (!store.selectedQuestion || !store.selectedQuestionId) return
+
+  const userMsg = { role: 'user' as const, content: text }
+  const updatedConversations = [...currentAiConversations.value, userMsg]
+
+  isGeneratingAiAnswer.value = true
+  aiAnswerError.value = ''
+  aiAnswerStreamingText.value = ''
+  aiAnswerAbortController = new AbortController()
+
+  await generateQuestionAnswer(
+    {
+      question: store.selectedQuestion,
+      conversation: updatedConversations,
+    },
+    {
+      onChunk(text) {
+        aiAnswerStreamingText.value = text
+      },
+      onDone(answer) {
+        const aiMsg = { role: 'assistant' as const, content: answer }
+        const finalConversations = [...updatedConversations, aiMsg]
+        store.saveAiAnswerData(store.selectedQuestionId!, {
+          answer,
+          conversations: finalConversations,
+          updatedAt: Date.now(),
+        })
+        currentAiConversations.value = finalConversations
+        isGeneratingAiAnswer.value = false
+        aiAnswerAbortController = null
+      },
+      onError(error) {
+        aiAnswerError.value = error
+        isGeneratingAiAnswer.value = false
+        aiAnswerAbortController = null
+      },
+    },
+    aiAnswerAbortController.signal,
+  )
+}
+
+function handleRegenerateAiAnswer() {
+  if (!store.selectedQuestionId) return
+  store.clearAiAnswerData(store.selectedQuestionId)
+  currentAiConversations.value = []
+  handleGenerateAiAnswer()
 }
 </script>
 
@@ -335,6 +466,19 @@ async function handleReviewAnswer() {
         />
 
         <QuestionFollowUpList :follow-up="store.selectedQuestion.answer.followUp" />
+
+        <QuestionAiAnswer
+          v-if="store.selectedQuestion"
+          :question-id="store.selectedQuestionId!"
+          :question="store.selectedQuestion"
+          :ai-answer-data="currentAiAnswerData"
+          :is-ai-configured="aiConfig.isConfigured"
+          :streaming-text="aiAnswerStreamingText"
+          @generate="handleGenerateAiAnswer"
+          @follow-up="handleAiFollowUp"
+          @regenerate="handleRegenerateAiAnswer"
+          @cancel="cancelAiAnswerGeneration"
+        />
       </div>
     </template>
 

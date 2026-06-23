@@ -1,5 +1,5 @@
 import MarkdownIt from 'markdown-it'
-import type { Chapter, PracticeRecord, Question } from '@/stores/questionBank'
+import type { Chapter, PracticeRecord, Question, AiAnswerData } from '@/stores/questionBank'
 import { buildQuestionReviewInsights } from '@/services/questionInsightService'
 
 type QuestionSourceLabel = {
@@ -101,6 +101,7 @@ export interface InterviewPrepExportInput {
   questions: Question[]
   chapters: Chapter[]
   practiceRecords: Record<string, PracticeRecord>
+  aiAnswers?: Record<string, AiAnswerData>
   generatedAt?: Date
 }
 
@@ -203,6 +204,22 @@ export function generateInterviewPrepMarkdown(input: InterviewPrepExportInput): 
       } else {
         lines.push('')
       }
+    }
+
+    const aiAnswer = input.aiAnswers?.[question.id]
+    if (aiAnswer?.answer.trim()) {
+      lines.push('#### AI 参考答案', '', aiAnswer.answer.trim(), '')
+      if (aiAnswer.conversations.length > 0) {
+        lines.push('', '##### 追问记录', '')
+        for (const msg of aiAnswer.conversations) {
+          if (msg.role === 'user') {
+            lines.push(`**追问：** ${msg.content}`)
+          } else {
+            lines.push(`${msg.content}`, '')
+          }
+        }
+      }
+      lines.push('')
     }
 
     lines.push('---', '')
