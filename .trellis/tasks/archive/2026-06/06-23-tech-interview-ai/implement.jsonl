@@ -1,0 +1,6 @@
+{"file": "scripts/rebuild_tech_interview_json.py", "reason": "数据重建脚本，读取 Excel sheet2 输出 JSON"}
+{"file": "src/data/tech-interview-questions.json", "reason": "重新生成的题库数据"}
+{"file": "src/stores/techInterviewQuestions.ts", "reason": "扩展 TechInterviewQuestion 类型 + aiAnswers 缓存 + localStorage 持久化"}
+{"file": "src/components/tech-interview/TechQuestionDetail.vue", "reason": "详情页增强：笔记ID/链接/岗位/轮次/技术领域/发布时间"}
+{"file": "src/services/techInterviewAnswerGenerationService.ts", "reason": "AI 流式生成服务，与题库 questionAnswerGenerationService.ts 模式一致"}
+{"file": "src/components/tech-interview/TechInterviewAiAnswer.vue", "reason": "三状态组件（idle/generating/done），与 QuestionAiAnswer.vue 模式一致"}
