@@ -1,10 +1,20 @@
 import { defineStore } from 'pinia'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
+import { loadJson, saveJson } from '@/services/safeStorage'
+import type { ChatMessage } from '@/services/aiClient'
 
 export interface TechInterviewQuestion {
   q: string
   f: number
   c: string[]
+  noteId?: string
+  noteTitle?: string
+  company?: string
+  position?: string
+  round?: string
+  techField?: string
+  link?: string
+  publishedAt?: string
 }
 
 export interface TechCategory {
@@ -19,7 +29,21 @@ interface TechInterviewData {
   questions: Record<string, TechInterviewQuestion[]>
 }
 
+export interface AiAnswerData {
+  answer: string
+  conversations: ChatMessage[]
+  updatedAt: number
+}
+
 export type SortBy = 'frequency' | 'default'
+
+const TECH_INTERVIEW_AI_ANSWERS_KEY = 'tech-interview-ai-answers'
+const TECH_INTERVIEW_SCHEMA_VERSION = 1
+
+interface AiAnswersStorageData {
+  schemaVersion: typeof TECH_INTERVIEW_SCHEMA_VERSION
+  answers: Record<string, AiAnswerData>
+}
 
 export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestions', () => {
   // 数据
@@ -39,6 +63,9 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   // 选中题目
   const selectedQuestionId = ref<string | null>(null)
   const selectedQuestion = ref<TechInterviewQuestion | null>(null)
+
+  // AI 答案缓存
+  const aiAnswers = ref<Record<string, AiAnswerData>>(loadAiAnswers())
 
   // 所有题目（平铺）
   const allQuestions = computed<TechInterviewQuestion[]>(() => {
@@ -101,6 +128,76 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
   // 加载数据
   let loadPromise: Promise<void> | null = null
+
+  // AI 答案持久化
+  function loadAiAnswers(): Record<string, AiAnswerData> {
+    const value = loadJson<AiAnswersStorageData | Record<string, AiAnswerData>>(
+      localStorage,
+      TECH_INTERVIEW_AI_ANSWERS_KEY,
+      {},
+    ).value
+    const answers =
+      value && typeof value === 'object' && !Array.isArray(value) && 'answers' in value
+        ? value.answers
+        : value
+    return normalizeAiAnswers(answers)
+  }
+
+  function saveAiAnswers(answers: Record<string, AiAnswerData>) {
+    saveJson(localStorage, TECH_INTERVIEW_AI_ANSWERS_KEY, {
+      schemaVersion: TECH_INTERVIEW_SCHEMA_VERSION,
+      answers,
+    } satisfies AiAnswersStorageData)
+  }
+
+  function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
+    if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+    const record = input as Record<string, unknown>
+    return Object.fromEntries(
+      Object.entries(record).map(([questionId, data]) => [
+        questionId,
+        normalizeAiAnswerData(data),
+      ]),
+    )
+  }
+
+  function normalizeAiAnswerData(input: unknown): AiAnswerData {
+    if (!input || typeof input !== 'object') {
+      return { answer: '', conversations: [], updatedAt: 0 }
+    }
+    const data = input as Partial<AiAnswerData>
+    return {
+      answer: String(data.answer ?? ''),
+      conversations: Array.isArray(data.conversations) ? data.conversations : [],
+      updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
+    }
+  }
+
+  // AI 答案自动保存
+  let aiAnswersSaveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    aiAnswers,
+    () => {
+      if (aiAnswersSaveTimer) clearTimeout(aiAnswersSaveTimer)
+      aiAnswersSaveTimer = setTimeout(() => {
+        saveAiAnswers(aiAnswers.value)
+      }, 500)
+    },
+    { deep: true },
+  )
+
+  function getAiAnswerData(questionId: string): AiAnswerData | null {
+    return aiAnswers.value[questionId] ?? null
+  }
+
+  function saveAiAnswerData(questionId: string, data: AiAnswerData) {
+    aiAnswers.value = { ...aiAnswers.value, [questionId]: data }
+  }
+
+  function clearAiAnswerData(questionId: string) {
+    const { [questionId]: _removed, ...rest } = aiAnswers.value
+    aiAnswers.value = rest
+  }
 
   async function ensureLoaded() {
     if (isLoaded.value) return
@@ -213,6 +310,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     sortBy,
     selectedQuestionId,
     selectedQuestion,
+    aiAnswers,
 
     // Computed
     allQuestions,
@@ -230,5 +328,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     clearFilters,
     selectNextQuestion,
     selectPrevQuestion,
+    getAiAnswerData,
+    saveAiAnswerData,
+    clearAiAnswerData,
   }
 })
