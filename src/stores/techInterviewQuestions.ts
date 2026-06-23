@@ -2,18 +2,19 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { loadJson, saveJson } from '@/services/safeStorage'
 import type { ChatMessage } from '@/services/aiClient'
+import aiAnswersFile from '@/data/ai-answers.json'
 
 export interface TechInterviewQuestion {
+  id: string
   q: string
   f: number
   c: string[]
+  techField?: string
   noteId?: string
   noteTitle?: string
-  company?: string
+  link?: string
   position?: string
   round?: string
-  techField?: string
-  link?: string
   publishedAt?: string
 }
 
@@ -38,15 +39,34 @@ export interface AiAnswerData {
 export type SortBy = 'frequency' | 'default'
 
 const TECH_INTERVIEW_AI_ANSWERS_KEY = 'tech-interview-ai-answers'
-const TECH_INTERVIEW_SCHEMA_VERSION = 1
+const TECH_INTERVIEW_SCHEMA_VERSION = 2
 
 interface AiAnswersStorageData {
-  schemaVersion: typeof TECH_INTERVIEW_SCHEMA_VERSION
+  schemaVersion: number
   answers: Record<string, AiAnswerData>
 }
 
+function normalizeAiAnswerData(input: unknown): AiAnswerData {
+  if (!input || typeof input !== 'object') {
+    return { answer: '', conversations: [], updatedAt: 0 }
+  }
+  const data = input as Partial<AiAnswerData>
+  return {
+    answer: String(data.answer ?? ''),
+    conversations: Array.isArray(data.conversations) ? data.conversations : [],
+    updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
+  }
+}
+
+function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+  const record = input as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries(record).map(([k, v]) => [k, normalizeAiAnswerData(v)]),
+  )
+}
+
 export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestions', () => {
-  // 数据
   const questionsByCategory = ref<Record<string, TechInterviewQuestion[]>>({})
   const categories = ref<TechCategory[]>([])
   const companies = ref<string[]>([])
@@ -54,43 +74,35 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const isLoaded = ref(false)
   const loadError = ref('')
 
-  // 筛选状态
   const activeCategoryId = ref<string | null>(null)
   const selectedCompanies = ref<string[]>([])
   const searchQuery = ref('')
   const sortBy = ref<SortBy>('frequency')
 
-  // 选中题目
   const selectedQuestionId = ref<string | null>(null)
   const selectedQuestion = ref<TechInterviewQuestion | null>(null)
 
-  // AI 答案缓存
   const aiAnswers = ref<Record<string, AiAnswerData>>(loadAiAnswers())
 
-  // 所有题目（平铺）
   const allQuestions = computed<TechInterviewQuestion[]>(() => {
     return Object.values(questionsByCategory.value).flat()
   })
 
-  // 筛选后的题目
   const filteredQuestions = computed<TechInterviewQuestion[]>(() => {
     let result: TechInterviewQuestion[]
 
-    // 1. 按分类筛选
     if (activeCategoryId.value) {
       result = questionsByCategory.value[activeCategoryId.value] ?? []
     } else {
       result = allQuestions.value
     }
 
-    // 2. 按公司筛选（OR 逻辑）
     if (selectedCompanies.value.length > 0) {
       result = result.filter((q) =>
         selectedCompanies.value.some((company) => q.c.includes(company)),
       )
     }
 
-    // 3. 按搜索词筛选
     if (searchQuery.value.trim()) {
       const query = searchQuery.value.toLowerCase()
       result = result.filter(
@@ -100,7 +112,6 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       )
     }
 
-    // 4. 排序
     if (sortBy.value === 'frequency') {
       result = [...result].sort((a, b) => b.f - a.f)
     }
@@ -108,7 +119,6 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     return result
   })
 
-  // 当前分类下的公司列表（用于筛选面板）
   const availableCompaniesInCategory = computed(() => {
     const companyCount: Record<string, number> = {}
     const source = activeCategoryId.value
@@ -126,21 +136,19 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       .map(([name, count]) => ({ name, count }))
   })
 
-  // 加载数据
   let loadPromise: Promise<void> | null = null
 
-  // AI 答案持久化
   function loadAiAnswers(): Record<string, AiAnswerData> {
     const value = loadJson<AiAnswersStorageData | Record<string, AiAnswerData>>(
       localStorage,
       TECH_INTERVIEW_AI_ANSWERS_KEY,
       {},
     ).value
-    const answers =
-      value && typeof value === 'object' && !Array.isArray(value) && 'answers' in value
-        ? value.answers
-        : value
-    return normalizeAiAnswers(answers)
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    if ('answers' in value && 'schemaVersion' in value) {
+      return normalizeAiAnswers((value as AiAnswersStorageData).answers)
+    }
+    return normalizeAiAnswers(value)
   }
 
   function saveAiAnswers(answers: Record<string, AiAnswerData>) {
@@ -150,30 +158,44 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     } satisfies AiAnswersStorageData)
   }
 
-  function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
-    if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
-    const record = input as Record<string, unknown>
-    return Object.fromEntries(
-      Object.entries(record).map(([questionId, data]) => [
-        questionId,
-        normalizeAiAnswerData(data),
-      ]),
-    )
+  function loadAiAnswersFromFile(): Record<string, AiAnswerData> {
+    return normalizeAiAnswers(aiAnswersFile)
   }
 
-  function normalizeAiAnswerData(input: unknown): AiAnswerData {
-    if (!input || typeof input !== 'object') {
-      return { answer: '', conversations: [], updatedAt: 0 }
-    }
-    const data = input as Partial<AiAnswerData>
-    return {
-      answer: String(data.answer ?? ''),
-      conversations: Array.isArray(data.conversations) ? data.conversations : [],
-      updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
-    }
+  async function ensureLoaded() {
+    if (isLoaded.value) return
+    if (loadPromise) return loadPromise
+
+    isLoading.value = true
+    loadError.value = ''
+
+    loadPromise = (async () => {
+      try {
+        const module = await import('@/data/tech-interview-questions.json')
+        const data = module.default as TechInterviewData
+        questionsByCategory.value = data.questions
+        categories.value = data.categories
+        companies.value = data.companies
+
+        const fileAnswers = loadAiAnswersFromFile()
+        for (const [k, v] of Object.entries(fileAnswers)) {
+          if (!aiAnswers.value[k]) {
+            aiAnswers.value[k] = v
+          }
+        }
+
+        isLoaded.value = true
+      } catch (error) {
+        loadError.value = error instanceof Error ? error.message : '题库加载失败'
+      } finally {
+        isLoading.value = false
+        loadPromise = null
+      }
+    })()
+
+    return loadPromise
   }
 
-  // AI 答案自动保存
   let aiAnswersSaveTimer: ReturnType<typeof setTimeout> | null = null
   watch(
     aiAnswers,
@@ -199,33 +221,6 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     aiAnswers.value = rest
   }
 
-  async function ensureLoaded() {
-    if (isLoaded.value) return
-    if (loadPromise) return loadPromise
-
-    isLoading.value = true
-    loadError.value = ''
-
-    loadPromise = (async () => {
-      try {
-        const module = await import('@/data/tech-interview-questions.json')
-        const data = module.default as TechInterviewData
-        questionsByCategory.value = data.questions
-        categories.value = data.categories
-        companies.value = data.companies
-        isLoaded.value = true
-      } catch (error) {
-        loadError.value = error instanceof Error ? error.message : '题库加载失败'
-      } finally {
-        isLoading.value = false
-        loadPromise = null
-      }
-    })()
-
-    return loadPromise
-  }
-
-  // Actions
   function selectCategory(id: string | null) {
     activeCategoryId.value = id
     selectedQuestionId.value = null
@@ -253,8 +248,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     sortBy.value = sort
   }
 
-  function selectQuestion(question: TechInterviewQuestion, id: string) {
-    selectedQuestionId.value = id
+  function selectQuestion(question: TechInterviewQuestion) {
+    selectedQuestionId.value = question.id
     selectedQuestion.value = question
   }
 
@@ -265,39 +260,31 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     sortBy.value = 'frequency'
   }
 
-  // 选中下一个/上一个
   function selectNextQuestion() {
     const list = filteredQuestions.value
     if (list.length === 0) return
     if (!selectedQuestion.value) {
-      const first = list[0]!
-      selectQuestion(first, '0')
+      selectQuestion(list[0]!)
       return
     }
-    const currentIdx = list.indexOf(selectedQuestion.value)
+    const currentIdx = list.findIndex((q) => q.id === selectedQuestion.value?.id)
     if (currentIdx < 0 || currentIdx >= list.length - 1) return
-    const nextIdx = currentIdx + 1
-    const next = list[nextIdx]!
-    selectQuestion(next, String(nextIdx))
+    selectQuestion(list[currentIdx + 1]!)
   }
 
   function selectPrevQuestion() {
     const list = filteredQuestions.value
     if (list.length === 0) return
     if (!selectedQuestion.value) {
-      const first = list[0]!
-      selectQuestion(first, '0')
+      selectQuestion(list[0]!)
       return
     }
-    const currentIdx = list.indexOf(selectedQuestion.value)
+    const currentIdx = list.findIndex((q) => q.id === selectedQuestion.value?.id)
     if (currentIdx <= 0) return
-    const prevIdx = currentIdx - 1
-    const prev = list[prevIdx]!
-    selectQuestion(prev, String(prevIdx))
+    selectQuestion(list[currentIdx - 1]!)
   }
 
   return {
-    // State
     questionsByCategory,
     categories,
     companies,
@@ -311,13 +298,9 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectedQuestionId,
     selectedQuestion,
     aiAnswers,
-
-    // Computed
     allQuestions,
     filteredQuestions,
     availableCompaniesInCategory,
-
-    // Actions
     ensureLoaded,
     selectCategory,
     toggleCompany,

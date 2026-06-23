@@ -20,8 +20,8 @@ const hasMoreCompanies = computed(() =>
   store.availableCompaniesInCategory.length > MAX_VISIBLE_COMPANIES,
 )
 
-function handleSelectQuestion(q: TechInterviewQuestion, index: number) {
-  store.selectQuestion(q, String(index))
+function handleSelectQuestion(q: TechInterviewQuestion) {
+  store.selectQuestion(q)
 }
 
 function isCompanySelected(company: string): boolean {
@@ -104,11 +104,11 @@ function getFrequencyClass(f: number): string {
     <!-- 题目列表 -->
     <ul class="questions">
       <li
-        v-for="(q, idx) in store.filteredQuestions"
-        :key="idx"
+        v-for="q in store.filteredQuestions"
+        :key="q.id"
         class="question-item"
-        :class="{ active: store.selectedQuestionId === String(idx) }"
-        @click="handleSelectQuestion(q, idx)"
+        :class="{ active: store.selectedQuestionId === q.id }"
+        @click="handleSelectQuestion(q)"
       >
         <div class="question-header">
           <span class="freq-pill" :class="getFrequencyClass(q.f)">

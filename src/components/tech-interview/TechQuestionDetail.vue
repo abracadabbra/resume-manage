@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
-import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
+import { useTechInterviewQuestionsStore, type TechInterviewQuestion } from '@/stores/techInterviewQuestions'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { generateTechInterviewAnswer } from '@/services/techInterviewAnswerGenerationService'
 import type { ChatMessage } from '@/services/aiClient'
@@ -19,6 +19,17 @@ const currentAiAnswerData = computed(() => {
   if (!store.selectedQuestionId) return null
   return store.getAiAnswerData(store.selectedQuestionId)
 })
+
+function toQuestionInput(q: TechInterviewQuestion) {
+  return {
+    q: q.q,
+    company: q.c?.[0],
+    position: q.position,
+    round: q.round,
+    techField: q.techField,
+    noteTitle: q.noteTitle,
+  }
+}
 
 // Sync conversations when switching to a question that already has cached data
 watch(
@@ -63,7 +74,7 @@ async function handleGenerateAiAnswer() {
 
   await generateTechInterviewAnswer(
     {
-      question: store.selectedQuestion,
+      question: toQuestionInput(store.selectedQuestion),
       conversation: currentAiConversations.value,
     },
     {
@@ -106,7 +117,7 @@ async function handleAiFollowUp(text: string) {
 
   await generateTechInterviewAnswer(
     {
-      question: store.selectedQuestion,
+      question: toQuestionInput(store.selectedQuestion),
       conversation: updatedConversations,
     },
     {
@@ -219,7 +230,7 @@ function handlePasteAnswer(text: string) {
 
       <TechInterviewAiAnswer
         v-if="store.selectedQuestion"
-        :question-id="store.selectedQuestionId!"
+        :question-id="store.selectedQuestionId ?? ''"
         :question="store.selectedQuestion"
         :ai-answer-data="currentAiAnswerData"
         :is-ai-configured="aiConfig.isConfigured"
