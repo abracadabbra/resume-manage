@@ -161,71 +161,77 @@ function handlePasteAnswer(text: string) {
     updatedAt: Date.now(),
   })
 }
+
+function handleEditAnswer(text: string) {
+  if (!store.selectedQuestionId) return
+  const existing = store.getAiAnswerData(store.selectedQuestionId)
+  store.saveAiAnswerData(store.selectedQuestionId, {
+    answer: text,
+    conversations: existing?.conversations ?? [],
+    updatedAt: Date.now(),
+  })
+}
 </script>
 
 <template>
   <div class="question-detail">
     <template v-if="store.selectedQuestion">
-      <div class="detail-header">
-        <div class="freq-badge" :class="{ hot: store.selectedQuestion.f >= 5 }">
+      <!-- 顶部 chip 栏：分类、公司、岗位、领域、发布时间 -->
+      <div class="chip-bar">
+        <span
+          class="chip chip-category"
+        >
+          {{ store.categories.find((c) => c.id === store.activeCategoryId)?.name ?? '全部分类' }}
+        </span>
+        <span
+          v-for="company in store.selectedQuestion.c"
+          :key="company"
+          class="chip chip-company"
+        >
+          {{ company }}
+        </span>
+        <span
+          v-if="store.selectedQuestion.position || store.selectedQuestion.round"
+          class="chip chip-position"
+        >
+          {{ [store.selectedQuestion.position, store.selectedQuestion.round].filter(Boolean).join(' / ') }}
+        </span>
+        <span
+          v-if="store.selectedQuestion.techField"
+          class="chip chip-tech"
+        >
+          {{ store.selectedQuestion.techField }}
+        </span>
+        <span
+          v-if="store.selectedQuestion.publishedAt"
+          class="chip chip-time"
+        >
+          {{ store.selectedQuestion.publishedAt }}
+        </span>
+        <span class="chip chip-freq" :class="{ hot: store.selectedQuestion.f >= 5 }">
           {{ store.selectedQuestion.f }} 次提及
-        </div>
-        <h3 class="question-text">{{ store.selectedQuestion.q }}</h3>
+        </span>
       </div>
 
-      <div class="detail-meta">
-        <div v-if="store.selectedQuestion.c.length" class="meta-section">
-          <span class="meta-label">涉及公司</span>
-          <div class="company-tags">
-            <span
-              v-for="company in store.selectedQuestion.c"
-              :key="company"
-              class="company-tag"
-            >
-              {{ company }}
-            </span>
-          </div>
-        </div>
+      <!-- 题目正文（视觉重心） -->
+      <div class="detail-header">
+        <h2 class="question-text">{{ store.selectedQuestion.q }}</h2>
+      </div>
 
-        <div class="meta-section">
-          <span class="meta-label">当前分类</span>
-          <span class="category-name-text">
-            {{ store.categories.find((c) => c.id === store.activeCategoryId)?.name ?? '全部分类' }}
-          </span>
-        </div>
-
-        <div v-if="store.selectedQuestion.position || store.selectedQuestion.round" class="meta-section">
-          <span class="meta-label">岗位 / 轮次</span>
-          <span class="meta-value">
-            {{ [store.selectedQuestion.position, store.selectedQuestion.round].filter(Boolean).join(' / ') }}
-          </span>
-        </div>
-
-        <div v-if="store.selectedQuestion.techField" class="meta-section">
-          <span class="meta-label">技术领域</span>
-          <span class="meta-value">{{ store.selectedQuestion.techField }}</span>
-        </div>
-
-        <div v-if="store.selectedQuestion.publishedAt" class="meta-section">
-          <span class="meta-label">发布时间</span>
-          <span class="meta-value">{{ store.selectedQuestion.publishedAt }}</span>
-        </div>
-
-        <div v-if="store.selectedQuestion.link" class="meta-section">
-          <a
-            :href="store.selectedQuestion.link"
-            target="_blank"
-            rel="noopener noreferrer"
-            class="note-link"
-          >
-            📎 查看原始笔记
-          </a>
-        </div>
-
-        <div v-if="store.selectedQuestion.noteId" class="meta-section">
-          <span class="meta-label">笔记 ID</span>
-          <span class="meta-value note-id">{{ store.selectedQuestion.noteId }}</span>
-        </div>
+      <!-- 笔记溯源（一行小字） -->
+      <div v-if="store.selectedQuestion.link || store.selectedQuestion.noteId" class="source-line">
+        <a
+          v-if="store.selectedQuestion.link"
+          :href="store.selectedQuestion.link"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="note-link"
+        >
+          📎 查看原始笔记
+        </a>
+        <span v-if="store.selectedQuestion.noteId" class="note-id">
+          ID: {{ store.selectedQuestion.noteId }}
+        </span>
       </div>
 
       <TechInterviewAiAnswer
@@ -240,6 +246,7 @@ function handlePasteAnswer(text: string) {
         @regenerate="handleRegenerateAiAnswer"
         @cancel="cancelAiAnswerGeneration"
         @paste-answer="handlePasteAnswer"
+        @edit-answer="handleEditAnswer"
       />
     </template>
 
@@ -261,77 +268,94 @@ function handlePasteAnswer(text: string) {
   background: #fff;
 }
 
-.detail-header {
-  margin-bottom: 24px;
+/* 顶部 chip 栏（一行多 chip） */
+.chip-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 20px;
+  align-items: center;
 }
 
-.freq-badge {
-  display: inline-block;
-  padding: 4px 12px;
-  border-radius: 20px;
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 14px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+}
+
+.chip-category {
+  background: #f3eef9;
+  color: #6b46c1;
+}
+
+.chip-company {
+  background: #eef4ff;
+  color: #48699d;
+}
+
+.chip-position {
+  background: #fef3e7;
+  color: #b06d1a;
+}
+
+.chip-tech {
+  background: #e6f5ee;
+  color: #1e7a4d;
+}
+
+.chip-time {
+  background: #f4f1ed;
+  color: #7b6a5b;
+  font-weight: 500;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.chip-freq {
   background: #fff4e5;
   color: #d97745;
-  font-size: 12px;
-  font-weight: 700;
-  margin-bottom: 12px;
 }
 
-.freq-badge.hot {
+.chip-freq.hot {
   background: #fde8e8;
   color: #c62828;
 }
 
+/* 题目正文（视觉重心） */
+.detail-header {
+  margin-bottom: 16px;
+}
+
 .question-text {
-  font-size: 18px;
-  font-weight: 600;
-  color: #2d2521;
+  font-size: 22px;
+  font-weight: 700;
+  color: #1a1410;
   line-height: 1.6;
   margin: 0;
+  letter-spacing: -0.01em;
 }
 
-.detail-meta {
+/* 笔记溯源（一行小字） */
+.source-line {
   display: flex;
-  flex-direction: column;
-  gap: 16px;
-  padding: 20px;
-  background: #faf8f5;
-  border-radius: 12px;
-  border: 1px solid #e8e0d5;
-  max-width: 100%;
-}
-
-.meta-section {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.meta-label {
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 16px;
+  margin-bottom: 16px;
+  border-bottom: 1px solid #f0ebe3;
   font-size: 11px;
-  font-weight: 600;
   color: #9b8a7c;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-.meta-value {
-  font-size: 13px;
-  color: #4a4035;
-  font-weight: 500;
-}
-
-.note-id {
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 11px;
-  color: #7c6af0;
-  word-break: break-all;
 }
 
 .note-link {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 13px;
+  font-size: 12px;
   font-weight: 600;
   color: #7c6af0;
   text-decoration: none;
@@ -343,25 +367,10 @@ function handlePasteAnswer(text: string) {
   text-decoration: underline;
 }
 
-.company-tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-
-.company-tag {
-  padding: 4px 10px;
-  border-radius: 6px;
-  background: #eef4ff;
-  color: #48699d;
-  font-size: 12px;
-  font-weight: 600;
-}
-
-.category-name-text {
-  font-size: 13px;
-  color: #4a4035;
-  font-weight: 600;
+.note-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11px;
+  color: #9b8a7c;
 }
 
 .empty-detail {

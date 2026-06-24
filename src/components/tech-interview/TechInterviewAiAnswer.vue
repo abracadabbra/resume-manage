@@ -17,6 +17,7 @@ const emit = defineEmits<{
   (e: 'regenerate'): void
   (e: 'cancel'): void
   (e: 'paste-answer', text: string): void
+  (e: 'edit-answer', text: string): void
 }>()
 
 const markdown = new MarkdownIt({ breaks: true, linkify: true })
@@ -35,6 +36,8 @@ const conversations = computed(() => props.aiAnswerData?.conversations ?? [])
 const followUpInput = ref('')
 const showPasteDialog = ref(false)
 const pastedAnswer = ref('')
+const isEditing = ref(false)
+const editingText = ref('')
 
 const QUICK_FOLLOW_UPS = [
   { label: '展开细节', text: '请展开每个要点，详细解释为什么和怎么做' },
@@ -79,6 +82,23 @@ function handleCancelPaste() {
   showPasteDialog.value = false
   pastedAnswer.value = ''
 }
+
+function startEdit() {
+  editingText.value = currentAnswer.value
+  isEditing.value = true
+}
+
+function cancelEdit() {
+  isEditing.value = false
+  editingText.value = ''
+}
+
+function saveEdit() {
+  const text = editingText.value.trim()
+  if (!text) return
+  emit('edit-answer', text)
+  isEditing.value = false
+}
 </script>
 
 <template>
@@ -115,9 +135,26 @@ function handleCancelPaste() {
 
     <!-- Done: show answer + follow-up UI -->
     <div v-else-if="state === 'done'" class="done-state">
-      <div class="answer-body" v-safe-html="markdown.render(currentAnswer)"></div>
+      <div v-if="!isEditing" class="answer-view">
+        <div class="answer-body" v-safe-html="markdown.render(currentAnswer)"></div>
+        <div class="answer-toolbar">
+          <button class="toolbar-btn" @click="startEdit">✏️ 编辑答案</button>
+        </div>
+      </div>
 
-      <div class="follow-up-area">
+      <div v-else class="answer-edit">
+        <textarea
+          v-model="editingText"
+          class="edit-textarea"
+          rows="40"
+        />
+        <div class="edit-actions">
+          <button class="cancel-btn" @click="cancelEdit">取消</button>
+          <button class="save-btn" :disabled="!editingText.trim()" @click="saveEdit">保存</button>
+        </div>
+      </div>
+
+      <div v-if="!isEditing" class="follow-up-area">
         <div class="follow-up-history" v-if="conversations.length > 0">
           <div
             v-for="(msg, idx) in conversations"
@@ -130,7 +167,10 @@ function handleCancelPaste() {
           </div>
         </div>
 
-        <div class="quick-follow-ups">
+        <div v-if="!isAiConfigured" class="followup-hint">
+          AI 未配置，无法使用快捷追问。可点击「✏️ 编辑答案」手动修改。
+        </div>
+        <div v-else class="quick-follow-ups">
           <button
             v-for="q in QUICK_FOLLOW_UPS"
             :key="q.label"
@@ -141,7 +181,7 @@ function handleCancelPaste() {
           </button>
         </div>
 
-        <div class="follow-up-input-row">
+        <div v-if="isAiConfigured" class="follow-up-input-row">
           <input
             v-model="followUpInput"
             class="follow-up-input"
@@ -281,7 +321,103 @@ function handleCancelPaste() {
 .done-state {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
+}
+
+.answer-view {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.answer-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  padding-top: 4px;
+}
+
+.toolbar-btn {
+  padding: 4px 12px;
+  background: transparent;
+  color: #7b6a5b;
+  border: 1px solid #e8e0d5;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.toolbar-btn:hover {
+  background: #faf8f5;
+  color: #d97745;
+  border-color: #d97745;
+}
+
+.answer-edit {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 12px;
+  background: #faf8f5;
+  border: 1px solid #e8e0d5;
+  border-radius: 8px;
+}
+
+.edit-textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid #e0d2c1;
+  border-radius: 6px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  background: #fff;
+  resize: vertical;
+  outline: none;
+  box-sizing: border-box;
+}
+
+.edit-textarea:focus {
+  border-color: #d97745;
+}
+
+.edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.save-btn {
+  padding: 6px 16px;
+  background: #d97745;
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.save-btn:hover:not(:disabled) {
+  background: #c66840;
+}
+
+.save-btn:disabled {
+  background: #e0d2c1;
+  color: #fff;
+  cursor: not-allowed;
+}
+
+.followup-hint {
+  padding: 10px 14px;
+  background: #fff8eb;
+  border: 1px dashed #e8c89a;
+  border-radius: 8px;
+  font-size: 12px;
+  color: #8a6a3a;
+  line-height: 1.5;
 }
 
 .answer-body {
