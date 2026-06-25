@@ -3460,7 +3460,7 @@
         "id": "my-ql-222"
       },
       {
-        "q": "**题目1**：有一张订单表t记录了用户完单的基本信息，包括用户id、完单城市、订单id、完单日期（字段：user_id, city_name, order_id, date）。请找出2021年、2022年、2023年均有完单记录的用户，并展示其各年的完单量，输出结果为以下形式：\nuser_id | order_num_21 | order_num_22 | order_num_23",
+        "q": "**题目1**：有一张订单表t记录了用户完单的基本信息，包括用户id、完单城市、订单id、完单日期（字段：user_id, city_name, order_id, date）。请找出2021年、2022年、2023年均有完单记录的用户，并展示其各年的完单量，输出结果为以下形式：\nuser_id | order_num_21 | order_num_22 | order_num_23\n\n例如：0001 | XX | XX | XX；9999 | XX | XX | XX",
         "f": 1,
         "c": [
           "滴滴"
@@ -3475,22 +3475,7 @@
         "id": "my-ql-223"
       },
       {
-        "q": "例如：0001 | XX | XX | XX；9999 | XX | XX | XX",
-        "f": 1,
-        "c": [
-          "滴滴"
-        ],
-        "noteId": "685508bf000000001100289d",
-        "noteTitle": "滴滴商分面经",
-        "position": "",
-        "round": "面试题",
-        "techField": "SQL（数据分析）",
-        "link": "https://www.xiaohongshu.com/explore/685508bf000000001100289d?xsec_token=ABKMdSXFlmgATdmM4ucCxXfYFdfwL8LfIAAANfcb-Vqmw=&xsec_source=pc_feed",
-        "publishedAt": "2025-06-20 15:07:43",
-        "id": "my-ql-224"
-      },
-      {
-        "q": "**题目2**：基于上述订单表t，请找出2021年、2022年、2023年各自完单排名前三的日期，并展示完单量、年内排名，输出结果为以下形式：\ndate | order_num | rank",
+        "q": "**题目2**：基于上述订单表t，请找出2021年、2022年、2023年各自完单排名前三的日期，并展示完单量、年内排名，输出结果为以下形式：\ndate | order_num | rank\n\n例如：2021-01-01 | XX | XX；2023-12-31 | XX | XX",
         "f": 1,
         "c": [
           "滴滴"
@@ -3505,22 +3490,7 @@
         "id": "my-ql-225"
       },
       {
-        "q": "例如：2021-01-01 | XX | XX；2023-12-31 | XX | XX",
-        "f": 1,
-        "c": [
-          "滴滴"
-        ],
-        "noteId": "685508bf000000001100289d",
-        "noteTitle": "滴滴商分面经",
-        "position": "",
-        "round": "面试题",
-        "techField": "SQL（数据分析）",
-        "link": "https://www.xiaohongshu.com/explore/685508bf000000001100289d?xsec_token=ABKMdSXFlmgATdmM4ucCxXfYFdfwL8LfIAAANfcb-Vqmw=&xsec_source=pc_feed",
-        "publishedAt": "2025-06-20 15:07:43",
-        "id": "my-ql-226"
-      },
-      {
-        "q": "**题目3**：基于上述订单表t，请算出2021年1月至2023年11月每月的用户次月留存率，输出结果为以下形式：\ndate | remain_rate",
+        "q": "**题目3**：基于上述订单表t，请算出2021年1月至2023年11月每月的用户次月留存率，输出结果为以下形式：\ndate | remain_rate\n\n例如：2021-01 | XX；……；2023-11 | XX",
         "f": 1,
         "c": [
           "滴滴"
@@ -3535,22 +3505,7 @@
         "id": "my-ql-227"
       },
       {
-        "q": "例如：2021-01 | XX；……；2023-11 | XX",
-        "f": 1,
-        "c": [
-          "滴滴"
-        ],
-        "noteId": "685508bf000000001100289d",
-        "noteTitle": "滴滴商分面经",
-        "position": "",
-        "round": "面试题",
-        "techField": "SQL（数据分析）",
-        "link": "https://www.xiaohongshu.com/explore/685508bf000000001100289d?xsec_token=ABKMdSXFlmgATdmM4ucCxXfYFdfwL8LfIAAANfcb-Vqmw=&xsec_source=pc_feed",
-        "publishedAt": "2025-06-20 15:07:43",
-        "id": "my-ql-228"
-      },
-      {
-        "q": "**题目4**：基于上述订单表t，请算出2023年1月新用户在2023年2月、3月……12月的留存率，输出结果为以下形式：\ndate | remain_rate",
+        "q": "**题目4**：基于上述订单表t，请算出2023年1月新用户在2023年2月、3月……12月的留存率，输出结果为以下形式：\ndate | remain_rate\n\n例如：2023-02 | XX；……；2023-12 | XX",
         "f": 1,
         "c": [
           "滴滴"
@@ -3563,21 +3518,6 @@
         "link": "https://www.xiaohongshu.com/explore/685508bf000000001100289d?xsec_token=ABKMdSXFlmgATdmM4ucCxXfYFdfwL8LfIAAANfcb-Vqmw=&xsec_source=pc_feed",
         "publishedAt": "2025-06-20 15:07:43",
         "id": "my-ql-229"
-      },
-      {
-        "q": "例如：2023-02 | XX；……；2023-12 | XX",
-        "f": 1,
-        "c": [
-          "滴滴"
-        ],
-        "noteId": "685508bf000000001100289d",
-        "noteTitle": "滴滴商分面经",
-        "position": "",
-        "round": "面试题",
-        "techField": "SQL（数据分析）",
-        "link": "https://www.xiaohongshu.com/explore/685508bf000000001100289d?xsec_token=ABKMdSXFlmgATdmM4ucCxXfYFdfwL8LfIAAANfcb-Vqmw=&xsec_source=pc_feed",
-        "publishedAt": "2025-06-20 15:07:43",
-        "id": "my-ql-230"
       },
       {
         "q": "自己部署mysql时，有考虑过给MySQL备份吗",
