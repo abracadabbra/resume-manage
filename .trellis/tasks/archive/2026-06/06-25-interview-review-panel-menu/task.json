@@ -1,0 +1,28 @@
+{
+  "id": "interview-review-panel-menu",
+  "name": "interview-review-panel-menu",
+  "title": "面试复盘面板独立菜单",
+  "description": "",
+  "status": "completed",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "shentao",
+  "assignee": "shentao",
+  "createdAt": "2026-06-25",
+  "completedAt": "2026-06-25",
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "06-25-tech-interview-mastery"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}
