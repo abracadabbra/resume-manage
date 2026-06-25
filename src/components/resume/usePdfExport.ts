@@ -1,6 +1,7 @@
 import { nextTick, ref, type Ref } from 'vue'
 import type { PageLayout } from '@/components/resume/useResumePagination'
 import {
+  A4_HEIGHT_MM,
   A4_PDF_FIRST_PAGE_INNER_HEIGHT_MM,
   A4_PDF_INNER_HEIGHT_MM,
   A4_WIDTH,
@@ -20,6 +21,11 @@ export interface UsePdfExportOptions {
 function waitNextFrame(): Promise<void> {
   return new Promise((resolve) => requestAnimationFrame(() => resolve()))
 }
+
+const SOFTWARE_ENGINEER_LEFT_BAR_WIDTH_PX = 6
+const SOFTWARE_ENGINEER_LEFT_BAR_COLOR = '#2a5caa'
+const SOFTWARE_ENGINEER_PAGE_BACKGROUND =
+  'linear-gradient(135deg, #ffffff 0%, #f5f8fc 50%, #eef3f9 100%)'
 
 export function usePdfExport(options: UsePdfExportOptions) {
   const exporting = ref(false)
@@ -68,6 +74,23 @@ export function usePdfExport(options: UsePdfExportOptions) {
 
     exportHost.appendChild(exportNode)
     document.body.appendChild(exportHost)
+
+    const softwareEngineerTemplate = exportNode.querySelector<HTMLElement>(
+      '.resume-template-software-engineer',
+    )
+    const isSoftwareEngineerTemplate = !!softwareEngineerTemplate
+
+    if (softwareEngineerTemplate) {
+      const exportHeight = `${layout.fullPaperHeight}px`
+      exportNode.style.minHeight = exportHeight
+      exportNode.style.background = SOFTWARE_ENGINEER_PAGE_BACKGROUND
+
+      const contentWrapper = softwareEngineerTemplate.parentElement
+      if (contentWrapper instanceof HTMLElement && exportNode.contains(contentWrapper)) {
+        contentWrapper.style.minHeight = exportHeight
+      }
+      softwareEngineerTemplate.style.minHeight = exportHeight
+    }
 
     try {
       await setExportProgress(8, '准备导出资源...')
@@ -123,38 +146,91 @@ export function usePdfExport(options: UsePdfExportOptions) {
 
       for (const [pageIndex, slice] of pageSlices.entries()) {
         const { start, height } = slice
+        const pdfPageWidthMm = A4_WIDTH_MM
+        const imgWidthMm = pdfPageWidthMm
+        const imgHeightMm = (height / canvas.width) * imgWidthMm
+        const pdfInnerHeightMm =
+          pageIndex === 0 ? A4_PDF_FIRST_PAGE_INNER_HEIGHT_MM : A4_PDF_INNER_HEIGHT_MM
+        const pageHeightMm = pageIndex === 0 ? A4_HEIGHT_MM - PAGE_MARGIN_MM : A4_HEIGHT_MM
+        const scaledImgHeightMm = Math.min(imgHeightMm, pdfInnerHeightMm)
+        const yOffsetMm =
+          pageIndex === 0
+            ? 0
+            : PAGE_MARGIN_MM + Math.max(0, (pageHeightMm - 2 * PAGE_MARGIN_MM - scaledImgHeightMm) / 2)
 
         const pageCanvas = document.createElement('canvas')
         pageCanvas.width = canvas.width
-        pageCanvas.height = height
+        pageCanvas.height = isSoftwareEngineerTemplate
+          ? Math.round((A4_HEIGHT_MM / A4_WIDTH_MM) * canvas.width)
+          : height
         const ctx = pageCanvas.getContext('2d')
         if (!ctx) break
         ctx.imageSmoothingEnabled = true
         ctx.imageSmoothingQuality = 'high'
         ctx.fillStyle = '#ffffff'
         ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
-        ctx.drawImage(canvas, 0, start, canvas.width, height, 0, 0, canvas.width, height)
+
+        if (isSoftwareEngineerTemplate) {
+          const yOffsetPx = Math.max(0, Math.round((yOffsetMm / A4_WIDTH_MM) * canvas.width))
+          const contentHeightPx = Math.max(
+            1,
+            Math.min(
+              pageCanvas.height - yOffsetPx,
+              Math.round((scaledImgHeightMm / A4_WIDTH_MM) * canvas.width),
+            ),
+          )
+
+          if (yOffsetPx > 0) {
+            ctx.drawImage(canvas, 0, start, canvas.width, 1, 0, 0, canvas.width, yOffsetPx)
+          }
+          ctx.drawImage(
+            canvas,
+            0,
+            start,
+            canvas.width,
+            height,
+            0,
+            yOffsetPx,
+            canvas.width,
+            contentHeightPx,
+          )
+
+          const bottomY = yOffsetPx + contentHeightPx
+          if (bottomY < pageCanvas.height) {
+            const bottomSourceY = Math.max(0, Math.min(canvas.height - 1, start + height - 1))
+            ctx.drawImage(
+              canvas,
+              0,
+              bottomSourceY,
+              canvas.width,
+              1,
+              0,
+              bottomY,
+              canvas.width,
+              pageCanvas.height - bottomY,
+            )
+          }
+        } else {
+          ctx.drawImage(canvas, 0, start, canvas.width, height, 0, 0, canvas.width, height)
+        }
+
+        if (isSoftwareEngineerTemplate) {
+          const scaleX = canvas.width / A4_WIDTH
+          const leftBarWidth = Math.max(1, Math.round(SOFTWARE_ENGINEER_LEFT_BAR_WIDTH_PX * scaleX))
+          ctx.fillStyle = SOFTWARE_ENGINEER_LEFT_BAR_COLOR
+          ctx.fillRect(0, 0, leftBarWidth, pageCanvas.height)
+        }
 
         const imgData = isHdMode ? pageCanvas.toDataURL('image/png') : pageCanvas.toDataURL('image/jpeg', 0.92)
-        const pdfPageWidthMm = A4_WIDTH_MM
-        let imgWidthMm = pdfPageWidthMm
-        let imgHeightMm = (height / canvas.width) * imgWidthMm
-        const pdfInnerHeightMm =
-          pageIndex === 0 ? A4_PDF_FIRST_PAGE_INNER_HEIGHT_MM : A4_PDF_INNER_HEIGHT_MM
-        if (imgHeightMm > pdfInnerHeightMm) {
-          const scale = pdfInnerHeightMm / imgHeightMm
-          imgHeightMm = pdfInnerHeightMm
-          imgWidthMm *= scale
-        }
 
         if (pageIndex > 0) pdf.addPage('a4', 'portrait')
         pdf.addImage(
           imgData,
           isHdMode ? 'PNG' : 'JPEG',
           0,
-          pageIndex === 0 ? 0 : PAGE_MARGIN_MM,
+          isSoftwareEngineerTemplate ? 0 : yOffsetMm,
           imgWidthMm,
-          imgHeightMm,
+          isSoftwareEngineerTemplate ? A4_HEIGHT_MM : scaledImgHeightMm,
           undefined,
           isHdMode ? 'NONE' : 'FAST',
         )

@@ -369,6 +369,14 @@ function handleExportMarkdown() {
   min-height: 0;
 }
 
+.paper:has(> .resume-template-software-engineer) {
+  padding-left: 6px;
+}
+
+.paper:has(> .resume-template-software-engineer) .resume-template-software-engineer {
+  min-height: 100%;
+}
+
 .paper.pdf-exporting {
   box-shadow: none;
   border: none;

@@ -241,26 +241,33 @@ function isLastVisibleSection(key: string): boolean {
   display: flex;
   flex-direction: column;
   font-family: 'PingFang SC', 'Microsoft YaHei', 'Helvetica Neue', Arial, sans-serif;
+  background: linear-gradient(135deg, #ffffff 0%, #f5f8fc 50%, #eef3f9 100%);
+  border-left: 6px solid #2a5caa;
+  position: relative;
 }
 
 /* ── Header: photo left, info right ── */
 .resume-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 20px;
-  margin-bottom: 14px;
-  padding-bottom: 14px;
-  border-bottom: 2px solid #2a5caa;
+  margin-bottom: 16px;
+  padding: 14px 22px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #2a5caa 0%, #4a7fd0 100%);
+  color: #fff;
   order: 0;
+  box-shadow: 0 4px 12px rgba(42, 92, 170, 0.18);
 }
 
 .avatar-wrap {
-  width: 100px;
-  height: 128px;
-  border-radius: 6px;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
   overflow: hidden;
   flex-shrink: 0;
-  border: 2px solid #d0dbed;
+  border: 3px solid #fff;
+  box-shadow: 0 0 0 3px rgba(124, 170, 230, 0.5), 0 0 14px rgba(124, 170, 230, 0.6);
 }
 
 .avatar-wrap img {
@@ -272,14 +279,16 @@ function isLastVisibleSection(key: string): boolean {
 .header-info {
   flex: 1;
   padding-top: 2px;
+  min-width: 0;
 }
 
 .name {
   font-size: 28px;
   font-weight: 700;
   line-height: 1.2;
-  color: #1a1a1a;
+  color: #fff;
   margin-bottom: 10px;
+  letter-spacing: 0.02em;
 }
 
 .contact-line {
@@ -287,7 +296,7 @@ function isLastVisibleSection(key: string): boolean {
   flex-wrap: wrap;
   column-gap: 16px;
   row-gap: 5px;
-  color: #333;
+  color: rgba(255, 255, 255, 0.92);
   font-size: 13px;
   line-height: 1.4;
   margin-bottom: 4px;
@@ -302,16 +311,16 @@ function isLastVisibleSection(key: string): boolean {
 
 .custom-line {
   gap: 0;
-  color: #555;
+  color: rgba(255, 255, 255, 0.92);
 }
 
 .meta-link {
-  color: #2a5caa;
+  color: #fff;
   text-decoration: none;
 }
 
 .meta-link:hover {
-  color: #1a4080;
+  color: #f5f0ff;
   text-decoration: underline;
 }
 
@@ -320,7 +329,7 @@ function isLastVisibleSection(key: string): boolean {
   width: 13px;
   height: 13px;
   fill: none;
-  stroke: #2a5caa;
+  stroke: #fff;
   stroke-width: 1.75;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -328,7 +337,7 @@ function isLastVisibleSection(key: string): boolean {
 }
 
 .meta-icon-fill {
-  fill: #2a5caa;
+  fill: #fff;
   stroke: none;
 }
 
@@ -353,13 +362,13 @@ function isLastVisibleSection(key: string): boolean {
   height: auto;
   line-height: 1;
   margin-bottom: 8px;
-  padding: 6px 10px;
+  padding: 6px 12px;
   font-size: 16px;
   font-weight: 700;
-  color: #1a1a1a;
-  background: #f0f2f5;
-  border-left: 4px solid #2a5caa;
-  border-radius: 0 3px 3px 0;
+  color: #fff;
+  background: linear-gradient(135deg, #2a5caa 0%, #3a6cb8 100%);
+  border-radius: 4px;
+  letter-spacing: 0.04em;
 }
 
 /* ── Entry layout ── */
@@ -541,5 +550,48 @@ function isLastVisibleSection(key: string): boolean {
 :deep(.entry-rich p) {
   margin: 2px 0;
   break-inside: avoid;
+}
+
+@media print {
+  .resume-template-software-engineer {
+    background: #fff;
+    border-left: none;
+  }
+
+  .resume-header {
+    background: #f5f8fc;
+    color: #1a1a1a;
+    box-shadow: none;
+    border: 1px solid #d0dbed;
+  }
+
+  .resume-header .name,
+  .resume-header .contact-line,
+  .resume-header .meta-link {
+    color: #1a1a1a;
+  }
+
+  .resume-header .meta-link {
+    color: #2a5caa;
+  }
+
+  .resume-header .meta-icon-svg {
+    stroke: #2a5caa;
+  }
+
+  .resume-header .meta-icon-fill {
+    fill: #2a5caa;
+  }
+
+  .avatar-wrap {
+    box-shadow: none;
+    border-color: #d0dbed;
+  }
+
+  .section-title {
+    background: #f0f2f5;
+    color: #1a1a1a;
+    border: 1px solid #d0dbed;
+  }
 }
 </style>
