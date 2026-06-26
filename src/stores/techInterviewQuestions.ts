@@ -36,7 +36,18 @@ export interface AiAnswerData {
   updatedAt: number
 }
 
+export type PracticeMastery = 'unpracticed' | 'practicing' | 'mastered' | 'weak'
+
+export interface PracticeRecord {
+  mastery: PracticeMastery
+  answer: string
+  notes: string
+  updatedAt: number | null
+}
+
 export type SortBy = 'frequency' | 'default'
+
+const TECH_INTERVIEW_PRACTICE_KEY = 'tech-interview-practice-records'
 
 const TECH_INTERVIEW_AI_ANSWERS_KEY = 'tech-interview-ai-answers'
 const TECH_INTERVIEW_SCHEMA_VERSION = 2
@@ -66,6 +77,32 @@ function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
   )
 }
 
+function loadPracticeRecords(): Record<string, PracticeRecord> {
+  const value = loadJson<Record<string, PracticeRecord>>(localStorage, TECH_INTERVIEW_PRACTICE_KEY, {}).value
+  if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(
+    Object.entries(value).map(([k, v]) => [k, normalizePracticeRecord(v)]),
+  )
+}
+
+function savePracticeRecords(records: Record<string, PracticeRecord>) {
+  saveJson(localStorage, TECH_INTERVIEW_PRACTICE_KEY, records)
+}
+
+function normalizePracticeRecord(input: unknown): PracticeRecord {
+  if (!input || typeof input !== 'object') {
+    return { mastery: 'unpracticed', answer: '', notes: '', updatedAt: null }
+  }
+  const r = input as Partial<PracticeRecord>
+  const validMasteries = ['unpracticed', 'practicing', 'mastered', 'weak']
+  return {
+    mastery: validMasteries.includes(r.mastery ?? '') ? r.mastery as PracticeMastery : 'unpracticed',
+    answer: String(r.answer ?? ''),
+    notes: String(r.notes ?? ''),
+    updatedAt: typeof r.updatedAt === 'number' ? r.updatedAt : null,
+  }
+}
+
 export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestions', () => {
   const questionsByCategory = ref<Record<string, TechInterviewQuestion[]>>({})
   const categories = ref<TechCategory[]>([])
@@ -83,6 +120,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const selectedQuestion = ref<TechInterviewQuestion | null>(null)
 
   const aiAnswers = ref<Record<string, AiAnswerData>>(loadAiAnswers())
+  const practiceRecords = ref<Record<string, PracticeRecord>>(loadPracticeRecords())
 
   const allQuestions = computed<TechInterviewQuestion[]>(() => {
     return Object.values(questionsByCategory.value).flat()
@@ -208,6 +246,30 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     { deep: true },
   )
 
+  let practiceSaveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    practiceRecords,
+    () => {
+      if (practiceSaveTimer) clearTimeout(practiceSaveTimer)
+      practiceSaveTimer = setTimeout(() => {
+        savePracticeRecords(practiceRecords.value)
+      }, 500)
+    },
+    { deep: true },
+  )
+
+  function getPracticeRecord(questionId: string): PracticeRecord {
+    return practiceRecords.value[questionId] ?? { mastery: 'unpracticed', answer: '', notes: '', updatedAt: null }
+  }
+
+  function setPracticeMastery(questionId: string, mastery: PracticeMastery) {
+    const current = getPracticeRecord(questionId)
+    practiceRecords.value = {
+      ...practiceRecords.value,
+      [questionId]: { ...current, mastery, updatedAt: Date.now() },
+    }
+  }
+
   function getAiAnswerData(questionId: string): AiAnswerData | null {
     return aiAnswers.value[questionId] ?? null
   }
@@ -298,6 +360,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectedQuestionId,
     selectedQuestion,
     aiAnswers,
+    practiceRecords,
     allQuestions,
     filteredQuestions,
     availableCompaniesInCategory,
@@ -314,5 +377,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     getAiAnswerData,
     saveAiAnswerData,
     clearAiAnswerData,
+    getPracticeRecord,
+    setPracticeMastery,
   }
 })

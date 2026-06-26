@@ -33,6 +33,41 @@ function getFrequencyClass(f: number): string {
   if (f >= 3) return 'freq-high'
   return 'freq-normal'
 }
+
+const MASTERY_LABELS: Record<string, string> = {
+  unpracticed: '未练',
+  practicing: '练过',
+  mastered: '熟练',
+  weak: '薄弱',
+}
+
+const MASTERY_CLASSES: Record<string, string> = {
+  unpracticed: 'mst-unpracticed',
+  practicing: 'mst-practicing',
+  mastered: 'mst-mastered',
+  weak: 'mst-weak',
+}
+
+function getMasteryClass(mastery: string): string {
+  return MASTERY_CLASSES[mastery] ?? 'mst-unpracticed'
+}
+
+const MASTERY_OPTIONS = ['unpracticed', 'practicing', 'mastered', 'weak'] as const
+
+const showMasteryMenuId = ref<string | null>(null)
+
+function toggleMasteryMenu(questionId: string) {
+  showMasteryMenuId.value = showMasteryMenuId.value === questionId ? null : questionId
+}
+
+function selectMastery(questionId: string, mastery: string) {
+  store.setPracticeMastery(questionId, mastery as 'unpracticed' | 'practicing' | 'mastered' | 'weak')
+  showMasteryMenuId.value = null
+}
+
+function getMasteryLabel(mastery: string): string {
+  return MASTERY_LABELS[mastery] ?? '未练'
+}
 </script>
 
 <template>
@@ -118,6 +153,28 @@ function getFrequencyClass(f: number): string {
             {{ company }}
           </span>
           <span v-if="q.c.length > 3" class="mini-tag mini-more">+{{ q.c.length - 3 }}</span>
+          <span class="mastery-chip-wrap">
+            <button
+              class="mastery-chip"
+              :class="getMasteryClass(store.getPracticeRecord(q.id).mastery)"
+              type="button"
+              @click.stop="toggleMasteryMenu(q.id)"
+            >
+              {{ getMasteryLabel(store.getPracticeRecord(q.id).mastery) }}
+            </button>
+            <div v-if="showMasteryMenuId === q.id" class="mastery-menu" @click.stop>
+              <button
+                v-for="m in MASTERY_OPTIONS"
+                :key="m"
+                class="mastery-menu-item"
+                :class="getMasteryClass(m)"
+                type="button"
+                @click="selectMastery(q.id, m)"
+              >
+                {{ MASTERY_LABELS[m] }}
+              </button>
+            </div>
+          </span>
         </div>
         <p class="question-text">{{ q.q }}</p>
       </li>
@@ -344,4 +401,52 @@ function getFrequencyClass(f: number): string {
   font-weight: 600;
   cursor: pointer;
 }
+
+.mastery-chip-wrap {
+  position: relative;
+  margin-left: auto;
+}
+
+.mastery-chip {
+  padding: 2px 8px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.mst-unpracticed { background: #f4f1ed; color: #9b8a7c; }
+.mst-practicing { background: #eef4ff; color: #48699d; }
+.mst-mastered { background: #f2f7f1; color: #43764d; }
+.mst-weak { background: #fde8e8; color: #c62828; }
+
+.mastery-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  background: #fff;
+  border: 1px solid #e0d2c1;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+  z-index: 100;
+  overflow: hidden;
+}
+
+.mastery-menu-item {
+  display: block;
+  width: 100%;
+  padding: 6px 14px;
+  border: none;
+  background: none;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.mastery-menu-item.mst-unpracticed:hover { background: #f4f1ed; color: #9b8a7c; }
+.mastery-menu-item.mst-practicing:hover { background: #eef4ff; color: #48699d; }
+.mastery-menu-item.mst-mastered:hover { background: #f2f7f1; color: #43764d; }
+.mastery-menu-item.mst-weak:hover { background: #fde8e8; color: #c62828; }
 </style>

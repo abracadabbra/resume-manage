@@ -7,7 +7,7 @@ import VersionManager from './VersionManager.vue'
 const props = withDefaults(
   defineProps<{
     collapsed?: boolean
-    activeMenu?: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview'
+    activeMenu?: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview' | 'interview-review'
   }>(),
   {
     collapsed: false,
@@ -17,7 +17,7 @@ const props = withDefaults(
 
 const emit = defineEmits<{
   (e: 'toggle-collapse'): void
-  (e: 'select-menu', key: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview'): void
+  (e: 'select-menu', key: 'resume-editor' | 'ai-interviewer' | 'question-bank' | 'jd-special' | 'tech-interview' | 'interview-review'): void
 }>()
 
 const store = useResumeStore()
@@ -54,6 +54,12 @@ const primaryMenus = [
     label: 'AI面试',
     iconPath:
       'M9 3h6M12 3v3m-6 4h12a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-3l-3 2-3-2H6a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2Zm3 3h.01M15 15h.01',
+  },
+  {
+    key: 'interview-review' as const,
+    label: '面试复盘',
+    iconPath:
+      'M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2M9 5a2 2 0 0 0 2 2h2a2 2 0 0 0 2-2M9 5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2m-6 9l2 2 4-4',
   },
 ]
 

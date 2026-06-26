@@ -13,7 +13,6 @@ import QuestionList from './QuestionList.vue'
 import QuestionDetail from './QuestionDetail.vue'
 import QuestionAdder from './QuestionAdder.vue'
 import ProjectQuestionGenerator from './ProjectQuestionGenerator.vue'
-import QuestionReviewInsights from './QuestionReviewInsights.vue'
 import ResumeQuestionGenerator from './ResumeQuestionGenerator.vue'
 
 const store = useQuestionBankStore()
@@ -295,8 +294,7 @@ onUnmounted(() => {
         <ProjectQuestionGenerator />
       </div>
       <QuestionAdder />
-      <QuestionReviewInsights />
-      <div class="bank-body">
+            <div class="bank-body">
         <QuestionChapterNav />
         <QuestionList />
         <QuestionDetail />

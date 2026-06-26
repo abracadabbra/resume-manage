@@ -9,6 +9,35 @@ import TechInterviewAiAnswer from './TechInterviewAiAnswer.vue'
 const store = useTechInterviewQuestionsStore()
 const aiConfig = useAiConfigStore()
 
+const MASTERY_LABELS: Record<string, string> = {
+  unpracticed: '未练',
+  practicing: '练过',
+  mastered: '熟练',
+  weak: '薄弱',
+}
+
+const MASTERY_CLASSES: Record<string, string> = {
+  unpracticed: 'mst-unpracticed',
+  practicing: 'mst-practicing',
+  mastered: 'mst-mastered',
+  weak: 'mst-weak',
+}
+
+const MASTERY_OPTIONS = ['unpracticed', 'practicing', 'mastered', 'weak'] as const
+
+function getMasteryLabel(mastery: string): string {
+  return MASTERY_LABELS[mastery] ?? '未练'
+}
+
+function getMasteryClass(mastery: string): string {
+  return MASTERY_CLASSES[mastery] ?? 'mst-unpracticed'
+}
+
+function currentMastery(): string {
+  if (!store.selectedQuestionId) return 'unpracticed'
+  return store.getPracticeRecord(store.selectedQuestionId).mastery
+}
+
 const isGeneratingAiAnswer = ref(false)
 const aiAnswerError = ref('')
 const aiAnswerStreamingText = ref('')
@@ -211,6 +240,18 @@ function handleEditAnswer(text: string) {
         <span class="chip chip-freq" :class="{ hot: store.selectedQuestion.f >= 5 }">
           {{ store.selectedQuestion.f }} 次提及
         </span>
+        <span class="mastery-bar">
+          <button
+            v-for="m in MASTERY_OPTIONS"
+            :key="m"
+            class="mastery-btn"
+            :class="[getMasteryClass(m), { active: currentMastery() === m }]"
+            type="button"
+            @click="store.setPracticeMastery(store.selectedQuestionId!, m)"
+          >
+            {{ getMasteryLabel(m) }}
+          </button>
+        </span>
       </div>
 
       <!-- 题目正文（视觉重心） -->
@@ -392,4 +433,34 @@ function handleEditAnswer(text: string) {
   color: #9b8a7c;
   margin: 0;
 }
+
+.mastery-bar {
+  display: flex;
+  gap: 6px;
+  margin-left: auto;
+  align-items: center;
+}
+
+.mastery-btn {
+  padding: 4px 12px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity 0.15s;
+}
+
+.mastery-btn:hover {
+  opacity: 0.8;
+}
+
+.mastery-btn.active {
+  box-shadow: 0 0 0 2px currentColor;
+}
+
+.mst-unpracticed { background: #f4f1ed; color: #9b8a7c; }
+.mst-practicing { background: #eef4ff; color: #48699d; }
+.mst-mastered { background: #f2f7f1; color: #43764d; }
+.mst-weak { background: #fde8e8; color: #c62828; }
 </style>
