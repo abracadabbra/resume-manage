@@ -4,6 +4,10 @@ import { buildQuestionReviewInsights } from '@/services/questionInsightService'
 import { useQuestionBankStore } from '@/stores/questionBank'
 import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 
+const emit = defineEmits<{
+  navigateToBank: []
+}>()
+
 const store = useQuestionBankStore()
 const techInterviewStore = useTechInterviewQuestionsStore()
 
@@ -62,11 +66,16 @@ function resetQuestionView() {
   store.setSearchQuery('')
 }
 
+function navigateToBank() {
+  emit('navigateToBank')
+}
+
 function openReviewQueue() {
   resetQuestionView()
   store.setViewFilter('review')
   const first = insights.value.reviewQueue[0]
   if (first) store.selectQuestion(first.questionId)
+  navigateToBank()
 }
 
 function openWeakQuestions() {
@@ -75,11 +84,13 @@ function openWeakQuestions() {
   store.setMasteryFilter('weak')
   const weakQuestion = insights.value.reviewQueue.find((item) => item.mastery === 'weak') ?? insights.value.reviewQueue[0]
   if (weakQuestion) store.selectQuestion(weakQuestion.questionId)
+  navigateToBank()
 }
 
 function openAllQuestions() {
   resetQuestionView()
   store.setViewFilter('all')
+  navigateToBank()
 }
 
 function jumpToQuestion(questionId: string) {

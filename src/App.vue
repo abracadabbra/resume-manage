@@ -45,7 +45,7 @@ function handleSelectMenu(key: PrimaryMenuKey) {
       <QuestionBankPanel v-else-if="activeMenu === 'question-bank'" />
       <JdSpecialPanel v-else-if="activeMenu === 'jd-special'" />
       <TechInterviewPanel v-else-if="activeMenu === 'tech-interview'" />
-      <InterviewReviewPanel v-else-if="activeMenu === 'interview-review'" />
+      <InterviewReviewPanel v-else-if="activeMenu === 'interview-review'" @navigate-to-bank="handleSelectMenu('question-bank')" />
       <AiInterviewerPanel v-else />
     </div>
   </div>
