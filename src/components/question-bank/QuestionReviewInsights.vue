@@ -2,16 +2,42 @@
 import { computed } from 'vue'
 import { buildQuestionReviewInsights } from '@/services/questionInsightService'
 import { useQuestionBankStore } from '@/stores/questionBank'
+import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 
 const store = useQuestionBankStore()
+const techInterviewStore = useTechInterviewQuestionsStore()
 
 const chapterNameMap = computed(() =>
   new Map(store.chapters.map((chapter) => [chapter.id, chapter.shortName || chapter.name])),
 )
 
-const insights = computed(() =>
-  buildQuestionReviewInsights(store.questions, store.practiceRecords),
-)
+const insights = computed(() => {
+  const base = buildQuestionReviewInsights(store.questions, store.practiceRecords)
+
+  const techRecords = techInterviewStore.practiceRecords
+  let techPracticed = 0
+  let techMastered = 0
+  let techWeak = 0
+  for (const record of Object.values(techRecords)) {
+    if (record.mastery !== 'unpracticed') {
+      techPracticed += 1
+      if (record.mastery === 'mastered') techMastered += 1
+      if (record.mastery === 'weak') techWeak += 1
+    }
+  }
+
+  if (techPracticed === 0) return base
+
+  return {
+    ...base,
+    summary: {
+      ...base.summary,
+      practicedQuestions: base.summary.practicedQuestions + techPracticed,
+      masteredCount: base.summary.masteredCount + techMastered,
+      weakCount: base.summary.weakCount + techWeak,
+    },
+  }
+})
 
 const hasInsightData = computed(() =>
   insights.value.summary.practicedQuestions > 0
