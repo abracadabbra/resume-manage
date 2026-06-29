@@ -4,16 +4,20 @@ import { buildQuestionReviewInsights } from '@/services/questionInsightService'
 import { useQuestionBankStore } from '@/stores/questionBank'
 import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 
-const emit = defineEmits<{
-  navigateToBank: []
-}>()
-
 const store = useQuestionBankStore()
 const techInterviewStore = useTechInterviewQuestionsStore()
 
 const chapterNameMap = computed(() =>
   new Map(store.chapters.map((chapter) => [chapter.id, chapter.shortName || chapter.name])),
 )
+
+interface MarkedItem {
+  id: string
+  text: string
+  source: '题库' | '大厂面经'
+  mastery: string
+  techField?: string
+}
 
 const insights = computed(() => {
   const base = buildQuestionReviewInsights(store.questions, store.practiceRecords)
@@ -43,6 +47,40 @@ const insights = computed(() => {
   }
 })
 
+const markedQuestions = computed<MarkedItem[]>(() => {
+  const items: MarkedItem[] = []
+
+  for (const q of store.questions) {
+    const record = store.practiceRecords[q.id]
+    if (record && record.mastery !== 'unpracticed') {
+      items.push({
+        id: q.id,
+        text: q.title,
+        source: '题库',
+        mastery: record.mastery,
+      })
+    }
+  }
+
+  for (const q of techInterviewStore.allQuestions) {
+    const record = techInterviewStore.practiceRecords[q.id]
+    if (record && record.mastery !== 'unpracticed') {
+      items.push({
+        id: q.id,
+        text: q.q,
+        source: '大厂面经',
+        mastery: record.mastery,
+        techField: q.techField,
+      })
+    }
+  }
+
+  return items.sort((a, b) => {
+    const order = { weak: 0, practicing: 1, mastered: 2 }
+    return order[a.mastery as keyof typeof order] - order[b.mastery as keyof typeof order]
+  })
+})
+
 const hasInsightData = computed(() =>
   insights.value.summary.practicedQuestions > 0
   || insights.value.summary.reviewCount > 0
@@ -66,16 +104,11 @@ function resetQuestionView() {
   store.setSearchQuery('')
 }
 
-function navigateToBank() {
-  emit('navigateToBank')
-}
-
 function openReviewQueue() {
   resetQuestionView()
   store.setViewFilter('review')
   const first = insights.value.reviewQueue[0]
   if (first) store.selectQuestion(first.questionId)
-  navigateToBank()
 }
 
 function openWeakQuestions() {
@@ -84,13 +117,11 @@ function openWeakQuestions() {
   store.setMasteryFilter('weak')
   const weakQuestion = insights.value.reviewQueue.find((item) => item.mastery === 'weak') ?? insights.value.reviewQueue[0]
   if (weakQuestion) store.selectQuestion(weakQuestion.questionId)
-  navigateToBank()
 }
 
 function openAllQuestions() {
   resetQuestionView()
   store.setViewFilter('all')
-  navigateToBank()
 }
 
 function jumpToQuestion(questionId: string) {
@@ -224,6 +255,29 @@ function markReviewQueuePracticed() {
               <span v-for="techStack in item.techStacks.slice(0, 2)" :key="techStack" class="queue-tag">
                 {{ techStack }}
               </span>
+            </div>
+          </button>
+        </div>
+      </section>
+
+      <section v-if="markedQuestions.length" class="queue-section">
+        <div class="queue-head">
+          <h4 class="section-title">我的标记</h4>
+          <span class="queue-tip">所有标记了熟练度的问题</span>
+        </div>
+        <div class="queue-list">
+          <button
+            v-for="item in markedQuestions"
+            :key="item.id"
+            type="button"
+            class="queue-item"
+          >
+            <div class="queue-item-main">
+              <span class="queue-title">{{ item.text }}</span>
+              <span class="queue-meta">{{ item.source }} · {{ { weak: '薄弱', practicing: '练习中', mastered: '熟练' }[item.mastery] }}</span>
+            </div>
+            <div v-if="item.techField" class="queue-tags">
+              <span class="queue-tag">{{ item.techField }}</span>
             </div>
           </button>
         </div>
