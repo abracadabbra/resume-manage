@@ -161,6 +161,9 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const searchQuery = ref('')
   const sortBy = ref<SortBy>('frequency')
 
+  /** 虚拟分类标识：薄弱题库 */
+  const WEAK_CATEGORY_ID = '__weak__'
+
   /** 搜索防抖：避免打字时频繁重算大列表 */
   const searchQueryDebounced = ref('')
   let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
@@ -183,10 +186,23 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     return Object.values(questionsByCategory.value).flat()
   })
 
+  /** 薄弱题库：高频 + 未熟练/薄弱（按 mention_count 倒序） */
+  const weakQuestions = computed<TechInterviewQuestion[]>(() => {
+    return allQuestions.value
+      .filter((q) => {
+        if (q.f < 3) return false
+        const mastery = practiceRecords.value[q.id]?.mastery ?? 'unpracticed'
+        return mastery === 'unpracticed' || mastery === 'weak'
+      })
+      .sort((a, b) => b.f - a.f)
+  })
+
   const filteredQuestions = computed<TechInterviewQuestion[]>(() => {
     let result: TechInterviewQuestion[]
 
-    if (activeCategoryId.value) {
+    if (activeCategoryId.value === WEAK_CATEGORY_ID) {
+      result = weakQuestions.value
+    } else if (activeCategoryId.value) {
       result = questionsByCategory.value[activeCategoryId.value] ?? []
     } else {
       result = allQuestions.value
@@ -220,7 +236,9 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const availableCompaniesInCategory = computed(() => {
     const companyCount: Record<string, number> = {}
     const source = activeCategoryId.value
-      ? questionsByCategory.value[activeCategoryId.value] ?? []
+      ? activeCategoryId.value === '__weak__'
+        ? weakQuestions.value
+        : questionsByCategory.value[activeCategoryId.value] ?? []
       : allQuestions.value
 
     for (const q of source) {
@@ -609,6 +627,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     filteredQuestions,
     filteredIdList,
     availableCompaniesInCategory,
+    weakQuestions,
     ensureLoaded,
     selectCategory,
     toggleCompany,

@@ -4,6 +4,9 @@ import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 
 const store = useTechInterviewQuestionsStore()
 
+/** 虚拟分类：薄弱题库 */
+const WEAK_CATEGORY_ID = '__weak__'
+
 // 核心技术分类
 const coreCategories = computed(() =>
   store.categories.filter((c) =>
@@ -33,6 +36,15 @@ const miscCategories = computed(() =>
     >
       <span class="category-name">全部分类</span>
       <span class="count">{{ store.allQuestions.length }}</span>
+    </button>
+
+    <button
+      class="category-item weak-item"
+      :class="{ active: store.activeCategoryId === '__weak__' }"
+      @click="store.selectCategory('__weak__')"
+    >
+      <span class="category-name">🔥 薄弱题库</span>
+      <span class="count">{{ store.weakQuestions.length }}</span>
     </button>
 
     <div class="section-label">核心技术</div>
