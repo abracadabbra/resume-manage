@@ -2,7 +2,9 @@ import { defineStore } from 'pinia'
 import { ref, computed, watch } from 'vue'
 import { loadJson, saveJson } from '@/services/safeStorage'
 import type { ChatMessage } from '@/services/aiClient'
-import aiAnswersFile from '@/data/ai-answers.json'
+import { useTechInterviewCloud, type CloudStoreAdapter } from './techInterviewCloud'
+import { useTechInterviewSyncState } from './techInterviewSyncState'
+import { fetchQuestionsAll, fetchAiAnswerByQid } from '@/services/techInterviewSupabaseApi'
 
 export interface TechInterviewQuestion {
   id: string
@@ -50,11 +52,35 @@ export type SortBy = 'frequency' | 'default'
 const TECH_INTERVIEW_PRACTICE_KEY = 'tech-interview-practice-records'
 
 const TECH_INTERVIEW_AI_ANSWERS_KEY = 'tech-interview-ai-answers'
+const TECH_INTERVIEW_AI_CONVERSATIONS_KEY = 'tech-interview-ai-conversations'
 const TECH_INTERVIEW_SCHEMA_VERSION = 2
+
+/** v3：AI 公共答案（仅 answer + updatedAt） */
+export interface AiAnswer {
+  answer: string
+  updatedAt: number
+}
+
+/** v3 兼容：旧版 AiAnswerData（answer + conversations）— UI 改完前先保留 */
+export interface AiAnswerData {
+  answer: string
+  conversations: ChatMessage[]
+  updatedAt: number
+}
+
+export interface AiConversations {
+  conversations: ChatMessage[]
+  updatedAt: number
+}
 
 interface AiAnswersStorageData {
   schemaVersion: number
   answers: Record<string, AiAnswerData>
+}
+
+interface AiConversationsStorageData {
+  schemaVersion: number
+  conversations: Record<string, AiConversations>
 }
 
 function normalizeAiAnswerData(input: unknown): AiAnswerData {
@@ -74,6 +100,25 @@ function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
   const record = input as Record<string, unknown>
   return Object.fromEntries(
     Object.entries(record).map(([k, v]) => [k, normalizeAiAnswerData(v)]),
+  )
+}
+
+function normalizeConversations(input: unknown): AiConversations {
+  if (!input || typeof input !== 'object') {
+    return { conversations: [], updatedAt: 0 }
+  }
+  const data = input as Partial<AiConversations>
+  return {
+    conversations: Array.isArray(data.conversations) ? data.conversations : [],
+    updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
+  }
+}
+
+function normalizeConversationsMap(input: unknown): Record<string, AiConversations> {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
+  const record = input as Record<string, unknown>
+  return Object.fromEntries(
+    Object.entries(record).map(([k, v]) => [k, normalizeConversations(v)]),
   )
 }
 
@@ -120,6 +165,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const selectedQuestion = ref<TechInterviewQuestion | null>(null)
 
   const aiAnswers = ref<Record<string, AiAnswerData>>(loadAiAnswers())
+  const aiAnswersLoaded = ref<Set<string>>(new Set())
+  const aiConversations = ref<Record<string, AiConversations>>(loadAiConversations())
   const practiceRecords = ref<Record<string, PracticeRecord>>(loadPracticeRecords())
 
   const allQuestions = computed<TechInterviewQuestion[]>(() => {
@@ -196,8 +243,24 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     } satisfies AiAnswersStorageData)
   }
 
-  function loadAiAnswersFromFile(): Record<string, AiAnswerData> {
-    return normalizeAiAnswers(aiAnswersFile)
+  function loadAiConversations(): Record<string, AiConversations> {
+    const value = loadJson<AiConversationsStorageData | Record<string, AiConversations>>(
+      localStorage,
+      TECH_INTERVIEW_AI_CONVERSATIONS_KEY,
+      {},
+    ).value
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
+    if ('conversations' in value && 'schemaVersion' in value) {
+      return normalizeConversationsMap((value as AiConversationsStorageData).conversations)
+    }
+    return normalizeConversationsMap(value)
+  }
+
+  function saveAiConversations(conversations: Record<string, AiConversations>) {
+    saveJson(localStorage, TECH_INTERVIEW_AI_CONVERSATIONS_KEY, {
+      schemaVersion: TECH_INTERVIEW_SCHEMA_VERSION,
+      conversations,
+    } satisfies AiConversationsStorageData)
   }
 
   async function ensureLoaded() {
@@ -209,22 +272,56 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
     loadPromise = (async () => {
       try {
-        const module = await import('@/data/tech-interview-questions.json')
-        const data = module.default as TechInterviewData
-        questionsByCategory.value = data.questions
-        categories.value = data.categories
-        companies.value = data.companies
+        // 优先从 Supabase 拉全量题目
+        const rows = await fetchQuestionsAll()
 
-        const fileAnswers = loadAiAnswersFromFile()
-        for (const [k, v] of Object.entries(fileAnswers)) {
-          if (!aiAnswers.value[k]) {
-            aiAnswers.value[k] = v
+        // 按 tech_field 分组，提取 companies 列表
+        const byCategory: Record<string, TechInterviewQuestion[]> = {}
+        const categorySet = new Map<string, number>()
+        const companySet = new Set<string>()
+
+        for (const row of rows) {
+          const q: TechInterviewQuestion = {
+            id: row.id,
+            q: row.question_text,
+            f: row.mention_count,
+            c: row.companies ?? [],
+            techField: row.tech_field ?? undefined,
+            noteId: row.note_id ?? undefined,
+            noteTitle: row.note_title ?? undefined,
+            link: row.link ?? undefined,
+            position: row.position ?? undefined,
+            round: row.round ?? undefined,
+            publishedAt: row.published_at ?? undefined,
           }
+
+          const cat = row.tech_field ?? 'other'
+          if (!byCategory[cat]) byCategory[cat] = []
+          byCategory[cat].push(q)
+
+          categorySet.set(cat, (categorySet.get(cat) ?? 0) + 1)
+          for (const co of row.companies ?? []) companySet.add(co)
         }
 
+        questionsByCategory.value = byCategory
+        categories.value = Array.from(categorySet)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([name, count]) => ({ id: name, name, count }))
+        companies.value = Array.from(companySet).sort()
+
         isLoaded.value = true
-      } catch (error) {
-        loadError.value = error instanceof Error ? error.message : '题库加载失败'
+      } catch (_error) {
+        // Fallback: 从本地 JSON 加载（Supabase 未配置或离线时）
+        try {
+          const module = await import('@/data/tech-interview-questions.json')
+          const data = module.default as TechInterviewData
+          questionsByCategory.value = data.questions
+          categories.value = data.categories
+          companies.value = data.companies
+          isLoaded.value = true
+        } catch (_inner) {
+          loadError.value = '题库加载失败'
+        }
       } finally {
         isLoading.value = false
         loadPromise = null
@@ -258,6 +355,70 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     { deep: true },
   )
 
+  let aiConversationsSaveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    aiConversations,
+    () => {
+      if (aiConversationsSaveTimer) clearTimeout(aiConversationsSaveTimer)
+      aiConversationsSaveTimer = setTimeout(() => {
+        saveAiConversations(aiConversations.value)
+      }, 500)
+    },
+    { deep: true },
+  )
+
+  // ---------- Cloud 注入 ----------
+
+  /** 当前登录用户 ID（由 App.vue 设置；未登录时为 null） */
+  const currentUserId = ref<string | null>(null)
+  function setCurrentUserId(userId: string | null) {
+    currentUserId.value = userId
+  }
+
+  const syncState = useTechInterviewSyncState()
+
+  const adapter: CloudStoreAdapter = {
+    userId: () => currentUserId.value,
+    getPractice: (qid) => {
+      const r = practiceRecords.value[qid]
+      if (!r) return null
+      return { mastery: r.mastery, answer: r.answer, notes: r.notes, updatedAt: r.updatedAt }
+    },
+    setPractice: (qid, snap) => {
+      practiceRecords.value = {
+        ...practiceRecords.value,
+        [qid]: {
+          mastery: snap.mastery,
+          answer: snap.answer,
+          notes: snap.notes,
+          updatedAt: snap.updatedAt,
+        },
+      }
+    },
+    getConversation: (qid) => {
+      const c = aiConversations.value[qid]
+      if (!c) return null
+      return { conversations: c.conversations, updatedAt: c.updatedAt }
+    },
+    setConversation: (qid, snap) => {
+      const updatedAt = snap.updatedAt ?? Date.now()
+      aiConversations.value = {
+        ...aiConversations.value,
+        [qid]: { conversations: snap.conversations as ChatMessage[], updatedAt },
+      }
+    },
+    setAiAnswer: (qid, _answer, updatedAt) => {
+      const existing = aiAnswers.value[qid]
+      if (!existing) return
+      aiAnswers.value = {
+        ...aiAnswers.value,
+        [qid]: { ...existing, updatedAt },
+      }
+    },
+  }
+
+  const cloud = useTechInterviewCloud(adapter)
+
   function getPracticeRecord(questionId: string): PracticeRecord {
     return practiceRecords.value[questionId] ?? { mastery: 'unpracticed', answer: '', notes: '', updatedAt: null }
   }
@@ -268,6 +429,46 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       ...practiceRecords.value,
       [questionId]: { ...current, mastery, updatedAt: Date.now() },
     }
+    cloud.schedulePush(questionId, 'practice')
+  }
+
+  function setPracticeAnswer(questionId: string, answer: string) {
+    const current = getPracticeRecord(questionId)
+    practiceRecords.value = {
+      ...practiceRecords.value,
+      [questionId]: { ...current, answer, updatedAt: Date.now() },
+    }
+    cloud.schedulePush(questionId, 'practice')
+  }
+
+  function setPracticeNotes(questionId: string, notes: string) {
+    const current = getPracticeRecord(questionId)
+    practiceRecords.value = {
+      ...practiceRecords.value,
+      [questionId]: { ...current, notes, updatedAt: Date.now() },
+    }
+    cloud.schedulePush(questionId, 'practice')
+  }
+
+  function getConversations(questionId: string): AiConversations | null {
+    return aiConversations.value[questionId] ?? null
+  }
+
+  function addConversationMessage(questionId: string, message: ChatMessage) {
+    const current = aiConversations.value[questionId] ?? { conversations: [], updatedAt: 0 }
+    aiConversations.value = {
+      ...aiConversations.value,
+      [questionId]: {
+        conversations: [...current.conversations, message],
+        updatedAt: Date.now(),
+      },
+    }
+    cloud.schedulePush(questionId, 'conversation')
+  }
+
+  function clearConversations(questionId: string) {
+    const { [questionId]: _removed, ...rest } = aiConversations.value
+    aiConversations.value = rest
   }
 
   function getAiAnswerData(questionId: string): AiAnswerData | null {
@@ -313,6 +514,28 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   function selectQuestion(question: TechInterviewQuestion) {
     selectedQuestionId.value = question.id
     selectedQuestion.value = question
+    loadAiAnswerIfNeeded(question.id)
+  }
+
+  /** 懒加载：按 question_id 拉取公共 AI 答案，仅首次 */
+  async function loadAiAnswerIfNeeded(questionId: string) {
+    if (aiAnswersLoaded.value.has(questionId)) return
+    aiAnswersLoaded.value.add(questionId)
+
+    const existing = aiAnswers.value[questionId]
+    if (existing?.answer) return // 已有 answer（本地编辑过）
+
+    try {
+      const answer = await fetchAiAnswerByQid(questionId)
+      if (answer) {
+        aiAnswers.value = {
+          ...aiAnswers.value,
+          [questionId]: { answer, conversations: [], updatedAt: Date.now() },
+        }
+      }
+    } catch (_err) {
+      // 静默失败，不阻塞用户
+    }
   }
 
   function clearFilters() {
@@ -360,6 +583,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectedQuestionId,
     selectedQuestion,
     aiAnswers,
+    aiConversations,
     practiceRecords,
     allQuestions,
     filteredQuestions,
@@ -377,7 +601,19 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     getAiAnswerData,
     saveAiAnswerData,
     clearAiAnswerData,
+    loadAiAnswerIfNeeded,
+    getConversations,
+    addConversationMessage,
+    clearConversations,
     getPracticeRecord,
     setPracticeMastery,
+    setPracticeAnswer,
+    setPracticeNotes,
+    // 云同步
+    setCurrentUserId,
+    cloudSyncStatus: cloud.status,
+    cloudConflicts: cloud.conflicts,
+    cloud,
+    syncState,
   }
 })

@@ -41,12 +41,18 @@ function currentMastery(): string {
 const isGeneratingAiAnswer = ref(false)
 const aiAnswerError = ref('')
 const aiAnswerStreamingText = ref('')
-const currentAiConversations = ref<ChatMessage[]>([])
 let aiAnswerAbortController: AbortController | null = null
 
-const currentAiAnswerData = computed(() => {
-  if (!store.selectedQuestionId) return null
-  return store.getAiAnswerData(store.selectedQuestionId)
+/** 当前题目的 AI 公共答案（来自云端） */
+const currentAiAnswer = computed(() => {
+  if (!store.selectedQuestionId) return ''
+  return store.aiAnswers[store.selectedQuestionId]?.answer ?? ''
+})
+
+/** 当前题目的追问对话（私有） */
+const currentAiConversations = computed(() => {
+  if (!store.selectedQuestionId) return []
+  return store.aiConversations[store.selectedQuestionId]?.conversations ?? []
 })
 
 function toQuestionInput(q: TechInterviewQuestion) {
@@ -60,17 +66,17 @@ function toQuestionInput(q: TechInterviewQuestion) {
   }
 }
 
-// Sync conversations when switching to a question that already has cached data
+// Sync conversations when switching to a question
 watch(
   () => store.selectedQuestionId,
   (id) => {
-    if (id) {
-      const cached = store.getAiAnswerData(id)
-      currentAiConversations.value = cached?.conversations ?? []
-    } else {
-      currentAiConversations.value = []
+    if (id && store.syncState.state.enabled) {
+      // 拉取 practice / conversation 详情（懒加载）
+      void store.cloud.loadPracticeDetail(id)
+      void store.cloud.loadConversationDetail(id)
     }
   },
+  { immediate: true },
 )
 
 function resetAiAnswerState() {
@@ -83,8 +89,11 @@ function resetAiAnswerState() {
 
 watch(
   () => store.selectedQuestionId,
-  () => {
+  (id) => {
     resetAiAnswerState()
+    if (id) {
+      void store.loadAiAnswerIfNeeded(id)
+    }
   },
 )
 
@@ -111,13 +120,11 @@ async function handleGenerateAiAnswer() {
         aiAnswerStreamingText.value = text
       },
       onDone(answer) {
-        const conversations = [
-          ...currentAiConversations.value,
-          { role: 'assistant' as const, content: answer },
-        ]
-        store.saveAiAnswerData(store.selectedQuestionId!, {
+        const qid = store.selectedQuestionId!
+        // 保存公共答案文本到 aiAnswers
+        store.saveAiAnswerData(qid, {
           answer,
-          conversations,
+          conversations: store.aiConversations[qid]?.conversations ?? [],
           updatedAt: Date.now(),
         })
         isGeneratingAiAnswer.value = false
@@ -136,32 +143,36 @@ async function handleGenerateAiAnswer() {
 async function handleAiFollowUp(text: string) {
   if (!store.selectedQuestion || !store.selectedQuestionId) return
 
-  const userMsg = { role: 'user' as const, content: text }
-  const updatedConversations = [...currentAiConversations.value, userMsg]
+  const qid = store.selectedQuestionId
+  const userMsg: ChatMessage = { role: 'user', content: text }
 
   isGeneratingAiAnswer.value = true
   aiAnswerError.value = ''
   aiAnswerStreamingText.value = ''
   aiAnswerAbortController = new AbortController()
 
+  // 追问用户消息先入私有 conversations 队列
+  store.addConversationMessage(qid, userMsg)
+  const convSnapshot = store.aiConversations[qid]?.conversations ?? []
+
   await generateTechInterviewAnswer(
     {
       question: toQuestionInput(store.selectedQuestion),
-      conversation: updatedConversations,
+      conversation: convSnapshot,
     },
     {
       onChunk(text) {
         aiAnswerStreamingText.value = text
       },
       onDone(answer) {
-        const aiMsg = { role: 'assistant' as const, content: answer }
-        const finalConversations = [...updatedConversations, aiMsg]
-        store.saveAiAnswerData(store.selectedQuestionId!, {
+        const aiMsg: ChatMessage = { role: 'assistant', content: answer }
+        store.addConversationMessage(qid, aiMsg)
+        // 同步公共答案文本（与追问无关，但保持一致）
+        store.saveAiAnswerData(qid, {
           answer,
-          conversations: finalConversations,
+          conversations: store.aiConversations[qid]?.conversations ?? [],
           updatedAt: Date.now(),
         })
-        currentAiConversations.value = finalConversations
         isGeneratingAiAnswer.value = false
         aiAnswerAbortController = null
       },
@@ -177,26 +188,27 @@ async function handleAiFollowUp(text: string) {
 
 function handleRegenerateAiAnswer() {
   if (!store.selectedQuestionId) return
+  // 重新生成只清 conversations 与 aiAnswers 内容（公共表不删）
+  store.clearConversations(store.selectedQuestionId)
   store.clearAiAnswerData(store.selectedQuestionId)
-  currentAiConversations.value = []
   handleGenerateAiAnswer()
 }
 
 function handlePasteAnswer(text: string) {
   if (!store.selectedQuestionId) return
+  // 粘贴答案到 aiAnswers（公共）；conversations 不变
   store.saveAiAnswerData(store.selectedQuestionId, {
     answer: text,
-    conversations: [],
+    conversations: store.aiConversations[store.selectedQuestionId]?.conversations ?? [],
     updatedAt: Date.now(),
   })
 }
 
 function handleEditAnswer(text: string) {
   if (!store.selectedQuestionId) return
-  const existing = store.getAiAnswerData(store.selectedQuestionId)
   store.saveAiAnswerData(store.selectedQuestionId, {
     answer: text,
-    conversations: existing?.conversations ?? [],
+    conversations: store.aiConversations[store.selectedQuestionId]?.conversations ?? [],
     updatedAt: Date.now(),
   })
 }
@@ -279,7 +291,8 @@ function handleEditAnswer(text: string) {
         v-if="store.selectedQuestion"
         :question-id="store.selectedQuestionId ?? ''"
         :question="store.selectedQuestion"
-        :ai-answer-data="currentAiAnswerData"
+        :answer="currentAiAnswer"
+        :conversations="currentAiConversations"
         :is-ai-configured="aiConfig.isConfigured"
         :streaming-text="aiAnswerStreamingText"
         @generate="handleGenerateAiAnswer"
