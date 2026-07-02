@@ -1,13 +1,15 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
+import { RecycleScroller } from 'vue-virtual-scroller'
+import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
 import { useTechInterviewQuestionsStore, type TechInterviewQuestion } from '@/stores/techInterviewQuestions'
+import QuestionListItem from './QuestionListItem.vue'
 
 const store = useTechInterviewQuestionsStore()
 
 const showAllCompanies = ref(false)
 const MAX_VISIBLE_COMPANIES = 8
 
-// 显示的公司列表
 const visibleCompanies = computed(() => {
   const all = store.availableCompaniesInCategory
   if (showAllCompanies.value || all.length <= MAX_VISIBLE_COMPANIES) {
@@ -20,54 +22,28 @@ const hasMoreCompanies = computed(() =>
   store.availableCompaniesInCategory.length > MAX_VISIBLE_COMPANIES,
 )
 
-function handleSelectQuestion(q: TechInterviewQuestion) {
-  store.selectQuestion(q)
+/** 当前可见公司是否已被全部选中（用于切换「全选/取消」按钮文案） */
+const isAllVisibleSelected = computed(() => {
+  const allNames = store.availableCompaniesInCategory.map((c) => c.name)
+  if (allNames.length === 0) return false
+  return allNames.every((name) => store.selectedCompanies.includes(name))
+})
+
+function toggleSelectAllVisible() {
+  if (isAllVisibleSelected.value) {
+    store.clearCompanyFilter()
+  } else {
+    const names = store.availableCompaniesInCategory.map((c) => c.name)
+    store.setSelectedCompanies(names)
+  }
 }
 
 function isCompanySelected(company: string): boolean {
   return store.selectedCompanies.includes(company)
 }
 
-function getFrequencyClass(f: number): string {
-  if (f >= 5) return 'freq-hot'
-  if (f >= 3) return 'freq-high'
-  return 'freq-normal'
-}
-
-const MASTERY_LABELS: Record<string, string> = {
-  unpracticed: '未练',
-  practicing: '练过',
-  mastered: '熟练',
-  weak: '薄弱',
-}
-
-const MASTERY_CLASSES: Record<string, string> = {
-  unpracticed: 'mst-unpracticed',
-  practicing: 'mst-practicing',
-  mastered: 'mst-mastered',
-  weak: 'mst-weak',
-}
-
-function getMasteryClass(mastery: string): string {
-  return MASTERY_CLASSES[mastery] ?? 'mst-unpracticed'
-}
-
-const MASTERY_OPTIONS = ['unpracticed', 'practicing', 'mastered', 'weak'] as const
-
-const showMasteryMenuId = ref<string | null>(null)
-
-function toggleMasteryMenu(questionId: string) {
-  showMasteryMenuId.value = showMasteryMenuId.value === questionId ? null : questionId
-}
-
-function selectMastery(questionId: string, mastery: string) {
-  store.setPracticeMastery(questionId, mastery as 'unpracticed' | 'practicing' | 'mastered' | 'weak')
-  showMasteryMenuId.value = null
-}
-
-function getMasteryLabel(mastery: string): string {
-  return MASTERY_LABELS[mastery] ?? '未练'
-}
+/** 估算列表行高：含 header (28px) + 2 行文本 padding 后的固定预估 */
+const ITEM_SIZE = 72
 </script>
 
 <template>
@@ -109,6 +85,12 @@ function getMasteryLabel(mastery: string): string {
           >
             {{ showAllCompanies ? '收起' : `+${store.availableCompaniesInCategory.length - MAX_VISIBLE_COMPANIES}` }}
           </button>
+          <button
+            class="chip chip-bulk"
+            @click="toggleSelectAllVisible"
+          >
+            {{ isAllVisibleSelected ? '取消全选' : '全选' }}
+          </button>
         </div>
       </div>
 
@@ -136,53 +118,27 @@ function getMasteryLabel(mastery: string): string {
       </div>
     </div>
 
-    <!-- 题目列表 -->
-    <ul class="questions">
-      <li
-        v-for="q in store.filteredQuestions"
-        :key="q.id"
-        class="question-item"
-        :class="{ active: store.selectedQuestionId === q.id }"
-        @click="handleSelectQuestion(q)"
+    <!-- 题目列表（虚拟滚动） -->
+    <div class="questions-scroll">
+      <RecycleScroller
+        v-if="store.filteredQuestions.length > 0"
+        class="scroller"
+        :items="store.filteredQuestions"
+        :item-size="ITEM_SIZE"
+        key-field="id"
+        v-slot="{ item, index }: { item: TechInterviewQuestion; index: number }"
       >
-        <div class="question-header">
-          <span class="freq-pill" :class="getFrequencyClass(q.f)">
-            {{ q.f }}次
-          </span>
-          <span v-for="company in q.c.slice(0, 3)" :key="company" class="mini-tag">
-            {{ company }}
-          </span>
-          <span v-if="q.c.length > 3" class="mini-tag mini-more">+{{ q.c.length - 3 }}</span>
-          <span class="mastery-chip-wrap">
-            <button
-              class="mastery-chip"
-              :class="getMasteryClass(store.getPracticeRecord(q.id).mastery)"
-              type="button"
-              @click.stop="toggleMasteryMenu(q.id)"
-            >
-              {{ getMasteryLabel(store.getPracticeRecord(q.id).mastery) }}
-            </button>
-            <div v-if="showMasteryMenuId === q.id" class="mastery-menu" @click.stop>
-              <button
-                v-for="m in MASTERY_OPTIONS"
-                :key="m"
-                class="mastery-menu-item"
-                :class="getMasteryClass(m)"
-                type="button"
-                @click="selectMastery(q.id, m)"
-              >
-                {{ MASTERY_LABELS[m] }}
-              </button>
-            </div>
-          </span>
-        </div>
-        <p class="question-text">{{ q.q }}</p>
-      </li>
-    </ul>
-
-    <div v-if="store.filteredQuestions.length === 0" class="empty-state">
-      <p>没有找到匹配的题目</p>
-      <button class="clear-btn" @click="store.clearFilters()">清空筛选</button>
+        <QuestionListItem
+          :question="item"
+          :index="index"
+          :active="store.selectedQuestionId === item.id"
+          :highlight="store.searchQueryDebounced.trim()"
+        />
+      </RecycleScroller>
+      <div v-else class="empty-state">
+        <p>没有找到匹配的题目</p>
+        <button class="clear-btn" @click="store.clearFilters()">清空筛选</button>
+      </div>
     </div>
   </div>
 </template>
@@ -195,6 +151,7 @@ function getMasteryLabel(mastery: string): string {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  height: 100%;
 }
 
 .list-header {
@@ -203,6 +160,7 @@ function getMasteryLabel(mastery: string): string {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex-shrink: 0;
 }
 
 .search-input {
@@ -267,6 +225,20 @@ function getMasteryLabel(mastery: string): string {
   color: #9b8a7c;
 }
 
+.chip-bulk {
+  margin-left: auto;
+  border-style: solid;
+  background: #f5f0ff;
+  color: #7c6af0;
+  border-color: #d4cef5;
+}
+
+.chip-bulk:hover {
+  background: #ebe5ff;
+  border-color: #7c6af0;
+  color: #7c6af0;
+}
+
 .list-toolbar {
   display: flex;
   align-items: center;
@@ -301,86 +273,16 @@ function getMasteryLabel(mastery: string): string {
   color: #fff;
 }
 
-.questions {
-  list-style: none;
-  margin: 0;
-  padding: 8px;
-  overflow-y: auto;
+.questions-scroll {
   flex: 1;
-}
-
-.question-item {
-  padding: 10px 12px;
-  border-radius: 8px;
-  cursor: pointer;
-  margin-bottom: 4px;
-  border: 1px solid transparent;
-  transition: all 0.15s;
-}
-
-.question-item:hover {
-  background: #f8f5f0;
-  border-color: #e8e0d5;
-}
-
-.question-item.active {
-  background: #fff;
-  border-color: #d97745;
-  box-shadow: 0 2px 8px rgba(217, 119, 69, 0.1);
-}
-
-.question-header {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  margin-bottom: 6px;
-  flex-wrap: wrap;
-}
-
-.freq-pill {
-  font-size: 10px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 10px;
-}
-
-.freq-hot {
-  background: #fde8e8;
-  color: #c62828;
-}
-
-.freq-high {
-  background: #fff4e5;
-  color: #d97745;
-}
-
-.freq-normal {
-  background: #f4f1ed;
-  color: #7b6a5b;
-}
-
-.mini-tag {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 4px;
-  background: #eef4ff;
-  color: #48699d;
-}
-
-.mini-more {
-  background: #f4f1ed;
-  color: #9b8a7c;
-}
-
-.question-text {
-  font-size: 13px;
-  color: #2d2521;
-  margin: 0;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
+  min-height: 0;
   overflow: hidden;
+}
+
+.scroller {
+  width: 100%;
+  height: 100%;
+  padding: 8px;
 }
 
 .empty-state {
@@ -402,51 +304,8 @@ function getMasteryLabel(mastery: string): string {
   cursor: pointer;
 }
 
-.mastery-chip-wrap {
-  position: relative;
-  margin-left: auto;
+.clear-btn:hover {
+  background: #d97745;
+  color: #fff;
 }
-
-.mastery-chip {
-  padding: 2px 8px;
-  border-radius: 10px;
-  font-size: 10px;
-  font-weight: 700;
-  cursor: pointer;
-  border: 1px solid transparent;
-}
-
-.mst-unpracticed { background: #f4f1ed; color: #9b8a7c; }
-.mst-practicing { background: #eef4ff; color: #48699d; }
-.mst-mastered { background: #f2f7f1; color: #43764d; }
-.mst-weak { background: #fde8e8; color: #c62828; }
-
-.mastery-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 4px);
-  background: #fff;
-  border: 1px solid #e0d2c1;
-  border-radius: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.1);
-  z-index: 100;
-  overflow: hidden;
-}
-
-.mastery-menu-item {
-  display: block;
-  width: 100%;
-  padding: 6px 14px;
-  border: none;
-  background: none;
-  font-size: 12px;
-  font-weight: 600;
-  cursor: pointer;
-  text-align: left;
-}
-
-.mastery-menu-item.mst-unpracticed:hover { background: #f4f1ed; color: #9b8a7c; }
-.mastery-menu-item.mst-practicing:hover { background: #eef4ff; color: #48699d; }
-.mastery-menu-item.mst-mastered:hover { background: #f2f7f1; color: #43764d; }
-.mastery-menu-item.mst-weak:hover { background: #fde8e8; color: #c62828; }
 </style>

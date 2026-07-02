@@ -1,12 +1,16 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import MarkdownIt from 'markdown-it'
-import type { TechInterviewQuestion, AiAnswerData } from '@/stores/techInterviewQuestions'
+import type { TechInterviewQuestion } from '@/stores/techInterviewQuestions'
+import type { ChatMessage } from '@/services/aiClient'
 
 const props = defineProps<{
   questionId: string
   question: TechInterviewQuestion
-  aiAnswerData: AiAnswerData | null
+  /** 公共 AI 答案文本（来自 tech_interview_ai_answers） */
+  answer: string
+  /** 个人追问对话（来自 tech_user_ai_conversations） */
+  conversations: ChatMessage[]
   isAiConfigured: boolean
   streamingText?: string
 }>()
@@ -25,19 +29,33 @@ const markdown = new MarkdownIt({ breaks: true, linkify: true })
 type State = 'idle' | 'generating' | 'done'
 
 const state = computed<State>(() => {
-  if (props.aiAnswerData?.answer) return 'done'
+  if (props.answer) return 'done'
   if (props.streamingText) return 'generating'
   return 'idle'
 })
 
-const currentAnswer = computed(() => props.aiAnswerData?.answer ?? props.streamingText ?? '')
-const conversations = computed(() => props.aiAnswerData?.conversations ?? [])
+const currentAnswer = computed(() => props.answer || props.streamingText || '')
 
 const followUpInput = ref('')
 const showPasteDialog = ref(false)
 const pastedAnswer = ref('')
 const isEditing = ref(false)
 const editingText = ref('')
+
+/** 追问历史容器 ref：用于在追加新消息后自动滚到底部 */
+const followUpHistoryRef = ref<HTMLElement | null>(null)
+
+/** 追问条数变化时滚动到底（涵盖切题、追加用户/AI 消息、初始加载） */
+watch(
+  () => props.conversations.length,
+  async () => {
+    await nextTick()
+    const el = followUpHistoryRef.value
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+  },
+  { immediate: true },
+)
 
 const QUICK_FOLLOW_UPS = [
   { label: '展开细节', text: '请展开每个要点，详细解释为什么和怎么做' },
@@ -155,7 +173,7 @@ function saveEdit() {
       </div>
 
       <div v-if="!isEditing" class="follow-up-area">
-        <div class="follow-up-history" v-if="conversations.length > 0">
+        <div ref="followUpHistoryRef" class="follow-up-history" v-if="conversations.length > 0">
           <div
             v-for="(msg, idx) in conversations"
             :key="idx"

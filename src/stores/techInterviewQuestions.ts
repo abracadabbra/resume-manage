@@ -5,6 +5,11 @@ import type { ChatMessage } from '@/services/aiClient'
 import { useTechInterviewCloud, type CloudStoreAdapter } from './techInterviewCloud'
 import { useTechInterviewSyncState } from './techInterviewSyncState'
 import { fetchQuestionsAll, fetchAiAnswerByQid } from '@/services/techInterviewSupabaseApi'
+import {
+  getCachedAiAnswer,
+  getCachedAiAnswers,
+  setCachedAiAnswer,
+} from '@/services/techInterviewAiAnswerCache'
 
 export interface TechInterviewQuestion {
   id: string
@@ -188,13 +193,13 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
   /** 薄弱题库：高频 + 未熟练/薄弱（按 mention_count 倒序） */
   const weakQuestions = computed<TechInterviewQuestion[]>(() => {
-    return allQuestions.value
-      .filter((q) => {
-        if (q.f < 3) return false
-        const mastery = practiceRecords.value[q.id]?.mastery ?? 'unpracticed'
-        return mastery === 'unpracticed' || mastery === 'weak'
-      })
-      .sort((a, b) => b.f - a.f)
+    const filtered = allQuestions.value.filter((q) => {
+      if (q.f < 3) return false
+      const mastery = practiceRecords.value[q.id]?.mastery ?? 'unpracticed'
+      return mastery === 'unpracticed' || mastery === 'weak'
+    })
+    // spread+sort 兼容当前 TS lib 配置，V8 in-place stable sort 开销可控
+    return [...filtered].sort((a, b) => b.f - a.f)
   })
 
   const filteredQuestions = computed<TechInterviewQuestion[]>(() => {
@@ -224,6 +229,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     }
 
     if (sortBy.value === 'frequency') {
+      // 标准 [...].sort 在 V8 中是 in-place stable sort，开销可控；这里保留 spread 以避免 TS lib 升级
       result = [...result].sort((a, b) => b.f - a.f)
     }
 
@@ -539,6 +545,10 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectedCompanies.value = []
   }
 
+  function setSelectedCompanies(companies: string[]) {
+    selectedCompanies.value = [...companies]
+  }
+
   function setSearchQuery(q: string) {
     searchQuery.value = q
   }
@@ -553,7 +563,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     loadAiAnswerIfNeeded(question.id)
   }
 
-  /** 懒加载：按 question_id 拉取公共 AI 答案，仅首次 */
+  /** 懒加载：先查 IDB 命中直接落内存；未命中才走网络，并回写 IDB */
   async function loadAiAnswerIfNeeded(questionId: string) {
     if (aiAnswersLoaded.value.has(questionId)) return
     aiAnswersLoaded.value.add(questionId)
@@ -561,6 +571,21 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     const existing = aiAnswers.value[questionId]
     if (existing?.answer) return // 已有 answer（本地编辑过）
 
+    // 1) 先看 IndexedDB 缓存
+    try {
+      const cached = await getCachedAiAnswer(questionId)
+      if (cached) {
+        aiAnswers.value = {
+          ...aiAnswers.value,
+          [questionId]: { answer: cached, conversations: [], updatedAt: Date.now() },
+        }
+        return
+      }
+    } catch (_err) {
+      // IDB 读失败 → 继续走网络
+    }
+
+    // 2) 网络拉取 + 回写 IDB
     try {
       const answer = await fetchAiAnswerByQid(questionId)
       if (answer) {
@@ -568,6 +593,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
           ...aiAnswers.value,
           [questionId]: { answer, conversations: [], updatedAt: Date.now() },
         }
+        // 异步回写，不阻塞 UI
+        void setCachedAiAnswer(questionId, answer)
       }
     } catch (_err) {
       // 静默失败，不阻塞用户
@@ -618,6 +645,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectedCompanies,
     searchQuery,
     sortBy,
+    searchQueryDebounced,
     selectedQuestionId,
     selectedQuestion,
     aiAnswers,
@@ -632,6 +660,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectCategory,
     toggleCompany,
     clearCompanyFilter,
+    setSelectedCompanies,
     setSearchQuery,
     setSortBy,
     selectQuestion,
