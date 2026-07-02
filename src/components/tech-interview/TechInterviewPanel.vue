@@ -1,16 +1,25 @@
 <script setup lang="ts">
 import { onMounted, onUnmounted, ref } from 'vue'
 import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
+import { useAuthStore } from '@/stores/auth'
 import TechCategoryNav from './TechCategoryNav.vue'
 import TechQuestionList from './TechQuestionList.vue'
 import TechQuestionDetail from './TechQuestionDetail.vue'
 import CloudSyncBanner from './CloudSyncBanner.vue'
 import CloudSyncConflictDialog from './CloudSyncConflictDialog.vue'
+import TechInterviewAuthDialog from './TechInterviewAuthDialog.vue'
 
 const store = useTechInterviewQuestionsStore()
+const auth = useAuthStore()
 const conflictDrawerOpen = ref(false)
+const authDialogOpen = ref(false)
 
 onMounted(async () => {
+  // 1) 初始化 auth（拉当前 session + 监听变化）
+  await auth.init()
+  // 同步 userId 给 techInterviewQuestions，供 cloud.adapter.userId() 使用
+  store.setCurrentUserId(auth.userId)
+
   await store.ensureLoaded()
   // 预加载前5道题的AI答案，减少翻题时的等待感
   if (store.isLoaded) {
@@ -18,8 +27,9 @@ onMounted(async () => {
     void Promise.all(preloadIds.map(id => store.loadAiAnswerIfNeeded(id)))
   }
   window.addEventListener('keydown', handleKeydown)
-  // 已登录则后台触发 pull（不阻塞）
-  if (store.syncState.state.enabled) {
+
+  // 2) 已登录且启用云同步 → 后台 pull（不阻塞）
+  if (auth.userId && store.syncState.state.enabled) {
     void store.cloud.pull()
   }
 })
@@ -57,7 +67,10 @@ function handleKeydown(e: KeyboardEvent) {
     </div>
 
     <template v-else-if="store.isLoaded">
-      <CloudSyncBanner @open-conflicts="conflictDrawerOpen = true" />
+      <CloudSyncBanner
+        @open-conflicts="conflictDrawerOpen = true"
+        @open-auth="authDialogOpen = true"
+      />
       <div class="content">
         <TechCategoryNav />
         <TechQuestionList />
@@ -66,6 +79,10 @@ function handleKeydown(e: KeyboardEvent) {
       <CloudSyncConflictDialog
         v-if="conflictDrawerOpen"
         @close="conflictDrawerOpen = false"
+      />
+      <TechInterviewAuthDialog
+        v-if="authDialogOpen"
+        @close="authDialogOpen = false"
       />
     </template>
   </div>

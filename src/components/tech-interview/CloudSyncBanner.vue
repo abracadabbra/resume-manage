@@ -1,14 +1,20 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
+import { useAuthStore } from '@/stores/auth'
 
 const store = useTechInterviewQuestionsStore()
+const auth = useAuthStore()
 
 const emit = defineEmits<{
   (e: 'open-conflicts'): void
+  (e: 'open-auth'): void
 }>()
 
 const conflictCount = computed(() => Object.keys(store.cloudConflicts).length)
+
+const isLoggedIn = computed(() => Boolean(auth.userId))
+const isSupabaseConfigured = computed(() => auth.isConfigured)
 
 const statusText = computed(() => {
   const s = store.cloudSyncStatus
@@ -46,7 +52,22 @@ async function handleSync() {
 </script>
 
 <template>
-  <div v-if="store.syncState.state.enabled" class="cloud-sync-banner">
+  <!-- 未配置 Supabase：不展示横幅（离线能力已可用） -->
+  <div v-if="!isSupabaseConfigured" class="cloud-sync-banner banner-disabled" />
+
+  <!-- 已配置但未登录：提示登录以启用云同步 -->
+  <div v-else-if="!isLoggedIn" class="cloud-sync-banner banner-info">
+    <div class="status">
+      <span class="dot" />
+      <span class="text">登录后可在多设备同步练习记录与 AI 追问对话</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" @click="emit('open-auth')">登录 / 注册</button>
+    </div>
+  </div>
+
+  <!-- 已登录且启用云同步：原云同步横幅 -->
+  <div v-else-if="store.syncState.state.enabled" class="cloud-sync-banner">
     <div class="status">
       <span class="dot" :class="store.cloudSyncStatus.kind" />
       <span class="text">{{ statusText }}</span>
@@ -62,6 +83,18 @@ async function handleSync() {
       <button class="btn" :disabled="isSyncing" @click="handleSync">
         立即同步
       </button>
+      <button class="btn btn-link" @click="auth.signOut()">登出</button>
+    </div>
+  </div>
+
+  <!-- 已登录但未启用 syncState：提示「启用云同步」 -->
+  <div v-else class="cloud-sync-banner banner-info">
+    <div class="status">
+      <span class="dot" />
+      <span class="text">已登录（{{ auth.email }}），尚未启用云同步</span>
+    </div>
+    <div class="actions">
+      <button class="btn btn-primary" @click="store.syncState.enable()">启用云同步</button>
     </div>
   </div>
 </template>
@@ -130,4 +163,36 @@ async function handleSync() {
   color: #c14a3a;
 }
 .btn-warn:hover { background: #ffe4c4; }
+
+.btn-primary {
+  background: #7c6af0;
+  border-color: #7c6af0;
+  color: #fff;
+}
+.btn-primary:hover {
+  background: #6a59d6;
+  color: #fff;
+  border-color: #6a59d6;
+}
+
+.btn-link {
+  border: none;
+  background: none;
+  color: #7c6af0;
+  text-decoration: underline;
+  padding: 4px 8px;
+}
+.btn-link:hover { background: #f5f0ff; }
+
+.banner-disabled {
+  visibility: hidden;
+  height: 0;
+  padding: 0;
+  border: none;
+}
+
+.banner-info {
+  background: #f5f0ff;
+  border-bottom-color: #d4cef5;
+}
 </style>

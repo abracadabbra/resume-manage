@@ -10,6 +10,7 @@ import {
   getCachedAiAnswers,
   setCachedAiAnswer,
 } from '@/services/techInterviewAiAnswerCache'
+import { useAuthStore } from './auth'
 
 export interface TechInterviewQuestion {
   id: string
@@ -411,12 +412,6 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
   // ---------- Cloud 注入 ----------
 
-  /** 当前登录用户 ID（由 App.vue 设置；未登录时为 null） */
-  const currentUserId = ref<string | null>(null)
-  function setCurrentUserId(userId: string | null) {
-    currentUserId.value = userId
-  }
-
   const syncState = useTechInterviewSyncState()
 
   const adapter: CloudStoreAdapter = {
@@ -460,6 +455,31 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   }
 
   const cloud = useTechInterviewCloud(adapter)
+
+  // ---------- Auth 联动 ----------
+
+  /** 当前登录用户 ID（由 Auth 注入；未登录时为 null） */
+  const currentUserId = ref<string | null>(null)
+  function setCurrentUserId(userId: string | null) {
+    currentUserId.value = userId
+  }
+
+  /**
+   * 跨 store 监听 Auth 状态变化：
+   * - 登录 → 同步 userId + 若已启用云同步则后台 pull
+   * - 登出 → 清空 userId（保留本地 store 数据，不删除）
+   */
+  const authStore = useAuthStore()
+  watch(
+    () => authStore.userId,
+    (id, prevId) => {
+      currentUserId.value = id
+      if (id && id !== prevId && syncState.state.value.enabled) {
+        void cloud.pull()
+      }
+    },
+    { immediate: true },
+  )
 
   function getPracticeRecord(questionId: string): PracticeRecord {
     return practiceRecords.value[questionId] ?? { mastery: 'unpracticed', answer: '', notes: '', updatedAt: null }
