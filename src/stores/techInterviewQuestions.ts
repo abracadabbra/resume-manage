@@ -161,6 +161,16 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const searchQuery = ref('')
   const sortBy = ref<SortBy>('frequency')
 
+  /** 搜索防抖：避免打字时频繁重算大列表 */
+  const searchQueryDebounced = ref('')
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null
+  watch(searchQuery, (val) => {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer)
+    searchDebounceTimer = setTimeout(() => {
+      searchQueryDebounced.value = val
+    }, 150)
+  })
+
   const selectedQuestionId = ref<string | null>(null)
   const selectedQuestion = ref<TechInterviewQuestion | null>(null)
 
@@ -188,8 +198,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       )
     }
 
-    if (searchQuery.value.trim()) {
-      const query = searchQuery.value.toLowerCase()
+    if (searchQueryDebounced.value.trim()) {
+      const query = searchQueryDebounced.value.toLowerCase()
       result = result.filter(
         (q) =>
           q.q.toLowerCase().includes(query)
@@ -203,6 +213,9 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
     return result
   })
+
+  /** 过滤列表的 id 数组（用于 O(1) 跳转） */
+  const filteredIdList = computed(() => filteredQuestions.value.map(q => q.id))
 
   const availableCompaniesInCategory = computed(() => {
     const companyCount: Record<string, number> = {}
@@ -344,6 +357,11 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   )
 
   let practiceSaveTimer: ReturnType<typeof setTimeout> | null = null
+
+  /** 切分类别时清空已加载标记，避免内存泄漏 */
+  watch(activeCategoryId, () => {
+    aiAnswersLoaded.value = new Set()
+  })
   watch(
     practiceRecords,
     () => {
@@ -552,7 +570,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       selectQuestion(list[0]!)
       return
     }
-    const currentIdx = list.findIndex((q) => q.id === selectedQuestion.value?.id)
+    const idMap = new Map(filteredIdList.value.map((id, i) => [id, i]))
+    const currentIdx = idMap.get(selectedQuestion.value.id) ?? -1
     if (currentIdx < 0 || currentIdx >= list.length - 1) return
     selectQuestion(list[currentIdx + 1]!)
   }
@@ -564,7 +583,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       selectQuestion(list[0]!)
       return
     }
-    const currentIdx = list.findIndex((q) => q.id === selectedQuestion.value?.id)
+    const idMap = new Map(filteredIdList.value.map((id, i) => [id, i]))
+    const currentIdx = idMap.get(selectedQuestion.value.id) ?? -1
     if (currentIdx <= 0) return
     selectQuestion(list[currentIdx - 1]!)
   }
@@ -587,6 +607,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     practiceRecords,
     allQuestions,
     filteredQuestions,
+    filteredIdList,
     availableCompaniesInCategory,
     ensureLoaded,
     selectCategory,
