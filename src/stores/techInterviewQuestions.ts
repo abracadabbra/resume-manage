@@ -5,6 +5,7 @@ import type { ChatMessage } from '@/services/aiClient'
 import { useTechInterviewCloud, type CloudStoreAdapter } from './techInterviewCloud'
 import { useTechInterviewSyncState } from './techInterviewSyncState'
 import { fetchQuestionsAll, fetchAiAnswerByQid, deleteConversations } from '@/services/techInterviewSupabaseApi'
+import { normalizeTechField, TECH_FIELD_CATEGORIES } from '@/services/techFieldCategory'
 import {
   getCachedAiAnswer,
   setCachedAiAnswer,
@@ -335,7 +336,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
             publishedAt: row.published_at ?? undefined,
           }
 
-          const cat = row.tech_field ?? 'other'
+          const cat = normalizeTechField(row.tech_field)
           if (!byCategory[cat]) byCategory[cat] = []
           byCategory[cat].push(q)
 
@@ -345,7 +346,14 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
         questionsByCategory.value = byCategory
         categories.value = Array.from(categorySet)
-          .sort(([a], [b]) => a.localeCompare(b))
+          // 按 17 个大类的 UI 顺序排，未在白名单的兜底类排最后
+          .sort(([a], [b]) => {
+            const order = (n: string) => {
+              const idx = TECH_FIELD_CATEGORIES.indexOf(n as never)
+              return idx === -1 ? TECH_FIELD_CATEGORIES.length : idx
+            }
+            return order(a) - order(b)
+          })
           .map(([name, count]) => ({ id: name, name, count }))
         companies.value = Array.from(companySet).sort()
 
