@@ -86,12 +86,13 @@ const highlightedQuestionHtml = computed(() => buildHighlightedHtml(props.questi
 </script>
 
 <template>
-  <div
-    class="question-item"
-    :class="{ active }"
-    :data-index="index"
-    @click="onSelect"
-  >
+  <div class="question-row">
+    <div
+      class="question-item"
+      :class="{ active }"
+      :data-index="index"
+      @click="onSelect"
+    >
     <div class="question-header">
       <span v-if="question.f >= 5" class="hot-star" title="高频热题">⭐</span>
       <span class="freq-pill" :class="getFreqClass(question.f)">{{ question.f }}次</span>
@@ -123,18 +124,24 @@ const highlightedQuestionHtml = computed(() => buildHighlightedHtml(props.questi
       </span>
     </div>
     <p class="question-text" v-html="highlightedQuestionHtml"></p>
+    </div>
   </div>
 </template>
 
 <style scoped>
+.question-row {
+  padding: 3px 0;
+  display: block;
+}
+
 .question-item {
   padding: 10px 12px;
   border-radius: 8px;
   cursor: pointer;
-  margin-bottom: 4px;
   border: 1px solid transparent;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
   transition: all 0.15s;
-  background: transparent;
 }
 
 .question-item:hover {
@@ -143,9 +150,9 @@ const highlightedQuestionHtml = computed(() => buildHighlightedHtml(props.questi
 }
 
 .question-item.active {
-  background: #fff;
+  background: #fff4e5;
   border-color: #d97745;
-  box-shadow: 0 2px 8px rgba(217, 119, 69, 0.1);
+  box-shadow: 0 0 0 2px rgba(217, 119, 69, 0.2);
 }
 
 .question-header {

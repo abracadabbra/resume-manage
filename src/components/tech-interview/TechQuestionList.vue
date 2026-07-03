@@ -42,8 +42,25 @@ function isCompanySelected(company: string): boolean {
   return store.selectedCompanies.includes(company)
 }
 
-/** 估算列表行高：含 header (28px) + 2 行文本 padding 后的固定预估 */
-const ITEM_SIZE = 72
+/**
+ * 按 item 估算行高，传给 RecycleScroller 动态布局。
+ * - header 高：1 行 mini-tag 24px；若公司 ≥4（+ more-chip 多一行）→ +22px
+ * - 文本：每行 18px，按字符数 / 28 估行数（中文 / 字母混合），最多 2 行
+ * - padding 上下 20px + row 间隔 6px
+ * 与 QuestionListItem.vue 中的 itemSize 公式保持一致，避免视觉跳动。
+ */
+function estimateItemSize(item: TechInterviewQuestion): number {
+  const HEADER_BASE = 24
+  const HEADER_EXTRA = 22
+  const PADDING_Y = 20
+  const ROW_GAP = 6
+  const LINE_H = 18
+  const MAX_LINES = 2
+  const charLen = item.q.length
+  const lines = Math.min(MAX_LINES, Math.max(1, Math.ceil(charLen / 28)))
+  const headerH = HEADER_BASE + (item.c.length >= 4 ? HEADER_EXTRA : 0)
+  return headerH + lines * LINE_H + PADDING_Y + ROW_GAP
+}
 </script>
 
 <template>
@@ -124,7 +141,7 @@ const ITEM_SIZE = 72
         v-if="store.filteredQuestions.length > 0"
         class="scroller"
         :items="store.filteredQuestions"
-        :item-size="ITEM_SIZE"
+        :item-size="estimateItemSize as unknown as number"
         key-field="id"
         v-slot="{ item, index }: { item: TechInterviewQuestion; index: number }"
       >
