@@ -1,8 +1,6 @@
 <script setup lang="ts">
 import { ref, computed } from 'vue'
-import { RecycleScroller } from 'vue-virtual-scroller'
-import 'vue-virtual-scroller/dist/vue-virtual-scroller.css'
-import { useTechInterviewQuestionsStore, type TechInterviewQuestion } from '@/stores/techInterviewQuestions'
+import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 import QuestionListItem from './QuestionListItem.vue'
 
 const store = useTechInterviewQuestionsStore()
@@ -40,26 +38,6 @@ function toggleSelectAllVisible() {
 
 function isCompanySelected(company: string): boolean {
   return store.selectedCompanies.includes(company)
-}
-
-/**
- * 按 item 估算行高，传给 RecycleScroller 动态布局。
- * - header 高：1 行 mini-tag 24px；若公司 ≥4（+ more-chip 多一行）→ +22px
- * - 文本：每行 18px，按字符数 / 28 估行数（中文 / 字母混合），最多 2 行
- * - padding 上下 20px + row 间隔 6px
- * 与 QuestionListItem.vue 中的 itemSize 公式保持一致，避免视觉跳动。
- */
-function estimateItemSize(item: TechInterviewQuestion): number {
-  const HEADER_BASE = 24
-  const HEADER_EXTRA = 22
-  const PADDING_Y = 20
-  const ROW_GAP = 6
-  const LINE_H = 18
-  const MAX_LINES = 2
-  const charLen = item.q.length
-  const lines = Math.min(MAX_LINES, Math.max(1, Math.ceil(charLen / 28)))
-  const headerH = HEADER_BASE + (item.c.length >= 4 ? HEADER_EXTRA : 0)
-  return headerH + lines * LINE_H + PADDING_Y + ROW_GAP
 }
 </script>
 
@@ -135,23 +113,18 @@ function estimateItemSize(item: TechInterviewQuestion): number {
       </div>
     </div>
 
-    <!-- 题目列表（虚拟滚动） -->
+    <!-- 题目列表（直接渲染 + CSS contain，撤掉 RecycleScroller 虚拟滚动避免行高问题） -->
     <div class="questions-scroll">
-      <RecycleScroller
-        v-if="store.filteredQuestions.length > 0"
-        class="scroller"
-        :items="store.filteredQuestions"
-        :item-size="estimateItemSize as unknown as number"
-        key-field="id"
-        v-slot="{ item, index }: { item: TechInterviewQuestion; index: number }"
-      >
+      <div v-if="store.filteredQuestions.length > 0" class="scroller">
         <QuestionListItem
+          v-for="(item, index) in store.filteredQuestions"
+          :key="item.id"
           :question="item"
           :index="index"
           :active="store.selectedQuestionId === item.id"
           :highlight="store.searchQueryDebounced.trim()"
         />
-      </RecycleScroller>
+      </div>
       <div v-else class="empty-state">
         <p>没有找到匹配的题目</p>
         <button class="clear-btn" @click="store.clearFilters()">清空筛选</button>
@@ -293,13 +266,12 @@ function estimateItemSize(item: TechInterviewQuestion): number {
 .questions-scroll {
   flex: 1;
   min-height: 0;
-  overflow: hidden;
+  overflow-y: auto;
+  contain: layout style;
 }
 
 .scroller {
-  width: 100%;
-  height: 100%;
-  padding: 8px;
+  padding: 4px 8px;
 }
 
 .empty-state {
