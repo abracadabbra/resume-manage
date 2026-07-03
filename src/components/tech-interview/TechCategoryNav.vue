@@ -4,9 +4,6 @@ import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 
 const store = useTechInterviewQuestionsStore()
 
-/** 虚拟分类：薄弱题库 */
-const WEAK_CATEGORY_ID = '__weak__'
-
 // 核心技术分类
 const coreCategories = computed(() =>
   store.categories.filter((c) =>
