@@ -4,10 +4,9 @@ import { loadJson, saveJson } from '@/services/safeStorage'
 import type { ChatMessage } from '@/services/aiClient'
 import { useTechInterviewCloud, type CloudStoreAdapter } from './techInterviewCloud'
 import { useTechInterviewSyncState } from './techInterviewSyncState'
-import { fetchQuestionsAll, fetchAiAnswerByQid } from '@/services/techInterviewSupabaseApi'
+import { fetchQuestionsAll, fetchAiAnswerByQid, deleteConversations } from '@/services/techInterviewSupabaseApi'
 import {
   getCachedAiAnswer,
-  getCachedAiAnswers,
   setCachedAiAnswer,
 } from '@/services/techInterviewAiAnswerCache'
 import { useAuthStore } from './auth'
@@ -184,7 +183,10 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const selectedQuestion = ref<TechInterviewQuestion | null>(null)
 
   const aiAnswers = ref<Record<string, AiAnswerData>>(loadAiAnswers())
+  /** 缓存的 AI 答案题目 ID，上限 300 防无限增长 */
   const aiAnswersLoaded = ref<Set<string>>(new Set())
+  const MAX_AI_LOADED = 300
+
   const aiConversations = ref<Record<string, AiConversations>>(loadAiConversations())
   const practiceRecords = ref<Record<string, PracticeRecord>>(loadPracticeRecords())
 
@@ -348,7 +350,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
         companies.value = Array.from(companySet).sort()
 
         isLoaded.value = true
-      } catch (_error) {
+      } catch {
         // Fallback: 从本地 JSON 加载（Supabase 未配置或离线时）
         try {
           const module = await import('@/data/tech-interview-questions.json')
@@ -357,7 +359,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
           categories.value = data.categories
           companies.value = data.companies
           isLoaded.value = true
-        } catch (_inner) {
+        } catch {
           loadError.value = '题库加载失败'
         }
       } finally {
@@ -531,6 +533,11 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   function clearConversations(questionId: string) {
     const { [questionId]: _removed, ...rest } = aiConversations.value
     aiConversations.value = rest
+    // 取消待推送队列，防止删除后又被推上云
+    syncState.unschedulePush(questionId, 'conversation')
+    // 异步从云端删除（不阻塞 UI）
+    const uid = currentUserId.value
+    if (uid) void deleteConversations(questionId, uid)
   }
 
   function getAiAnswerData(questionId: string): AiAnswerData | null {
@@ -586,6 +593,15 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   /** 懒加载：先查 IDB 命中直接落内存；未命中才走网络，并回写 IDB */
   async function loadAiAnswerIfNeeded(questionId: string) {
     if (aiAnswersLoaded.value.has(questionId)) return
+    // Bounded cache：Set 超过上限时淘汰最早的（Set 保留插入顺序）
+    if (aiAnswersLoaded.value.size >= MAX_AI_LOADED) {
+      const iter = aiAnswersLoaded.value.values()
+      for (let i = 0; i < MAX_AI_LOADED / 2; i++) {
+        const { value, done } = iter.next()
+        if (done) break
+        aiAnswersLoaded.value.delete(value!)
+      }
+    }
     aiAnswersLoaded.value.add(questionId)
 
     const existing = aiAnswers.value[questionId]
@@ -601,8 +617,9 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
         }
         return
       }
-    } catch (_err) {
-      // IDB 读失败 → 继续走网络
+    } catch {
+      console.warn('[TechQuestions] IDB 读缓存失败', questionId)
+      // 继续走网络
     }
 
     // 2) 网络拉取 + 回写 IDB
@@ -616,7 +633,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
         // 异步回写，不阻塞 UI
         void setCachedAiAnswer(questionId, answer)
       }
-    } catch (_err) {
+    } catch {
+      console.warn('[TechQuestions] 网络拉取 AI 答案失败', questionId)
       // 静默失败，不阻塞用户
     }
   }

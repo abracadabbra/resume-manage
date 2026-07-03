@@ -50,6 +50,8 @@ function create(adapter: CloudStoreAdapter) {
   const status: Ref<CloudSyncStatus> = ref({ kind: 'idle' })
   const conflicts: Ref<ConflictMap> = ref({})
   const running = ref(false)
+  const pulling = ref(false)
+  const pushing = ref(false)
   const online = ref(typeof navigator !== 'undefined' ? navigator.onLine : true)
 
   // ---------- helpers ----------
@@ -75,6 +77,7 @@ function create(adapter: CloudStoreAdapter) {
   // ---------- pull ----------
 
   async function pull() {
+    if (pulling.value) return
     if (isOffline()) {
       setStatus({ kind: 'offline', lastSyncedAt: sync.state.value.lastSyncedAt })
       return
@@ -82,13 +85,14 @@ function create(adapter: CloudStoreAdapter) {
     if (!sync.state.value.enabled) return
     if (!adapter.userId()) return
 
+    pulling.value = true
     setStatus({ kind: 'pulling' })
     try {
       const [qMeta, aiMeta, pMeta, cMeta] = await Promise.all([
         api.fetchQuestionsMeta(),
         api.fetchAiAnswersMeta(),
-        api.fetchPracticeMeta(),
-        api.fetchConversationsMeta(),
+        api.fetchPracticeMeta(adapter.userId()!),
+        api.fetchConversationsMeta(adapter.userId()!),
       ])
 
       // 1) AI 答案元数据 → store（公共来源）
@@ -99,6 +103,7 @@ function create(adapter: CloudStoreAdapter) {
 
       // 2) practice 行级合并 + 冲突
       const newConflicts: ConflictMap = { ...conflicts.value }
+      const isFirstSync = sync.state.value.lastSyncedAt === null
       for (const m of pMeta) {
         const cloudTs = new Date(m.updated_at).getTime()
         const local = adapter.getPractice(m.question_id)
@@ -117,7 +122,8 @@ function create(adapter: CloudStoreAdapter) {
           // 云端新 → 覆盖 mastery（answer/notes 懒加载）
           adapter.setPractice(m.question_id, { ...local, mastery: m.mastery, updatedAt: cloudTs })
         }
-        if (local && local.updatedAt && local.updatedAt > lastSyncedAt && cloudTs > lastSyncedAt) {
+        // 首次同步不报冲突（两边都有数据是正常首次合并，不是"同时修改"）
+        if (!isFirstSync && local && local.updatedAt && local.updatedAt > lastSyncedAt && cloudTs > lastSyncedAt) {
           newConflicts[m.question_id] = {
             kind: 'practice',
             local: { mastery: local.mastery, answer: local.answer, notes: local.notes, updated_at: local.updatedAt },
@@ -138,7 +144,8 @@ function create(adapter: CloudStoreAdapter) {
         } else {
           adapter.setConversation(m.question_id, { conversations: [], updatedAt: cloudTs })
         }
-        if (local && local.updatedAt && local.updatedAt > lastSyncedAt && cloudTs > lastSyncedAt) {
+        // 首次同步不报冲突
+        if (!isFirstSync && local && local.updatedAt && local.updatedAt > lastSyncedAt && cloudTs > lastSyncedAt) {
           newConflicts[m.question_id] = {
             kind: 'conversation',
             local: { conversations: local.conversations, updated_at: local.updatedAt },
@@ -155,13 +162,15 @@ function create(adapter: CloudStoreAdapter) {
       if (latest > 0) sync.setLastSyncedAt(latest)
     } catch (e) {
       setStatus({ kind: 'error', message: e instanceof Error ? e.message : 'pull 失败' })
-      return
+    } finally {
+      pulling.value = false
     }
   }
 
   // ---------- push ----------
 
   async function push(): Promise<void> {
+    if (pushing.value) return
     if (isOffline()) {
       setStatus({ kind: 'offline', lastSyncedAt: sync.state.value.lastSyncedAt })
       return
@@ -178,7 +187,10 @@ function create(adapter: CloudStoreAdapter) {
       return
     }
 
+    pushing.value = true
     setStatus({ kind: 'pushing', queueSize: practiceIds.length + conversationIds.length })
+
+    try {
 
     // 过滤：冲突中的行不自动推
     const conflictedIds = new Set(Object.keys(conflicts.value))
@@ -218,18 +230,25 @@ function create(adapter: CloudStoreAdapter) {
       })
       .filter((r): r is api.ConversationRow => r !== null)
 
-    let practiceFailed: string[] = []
-    let convFailed: string[] = []
-    try {
-      [practiceFailed, convFailed] = await Promise.all([
-        api.upsertPracticeBatch(practiceRows),
-        api.upsertConversationsBatch(conversationRows),
-      ])
-    } catch (e) {
-      setStatus({ kind: 'error', message: e instanceof Error ? e.message : 'push 失败' })
-      return
+    let practiceFailed: string[] = practiceRows.map((r) => r.question_id) // 默认全失败
+    let convFailed: string[] = conversationRows.map((r) => r.question_id)
+
+    const settled = await Promise.allSettled([
+      api.upsertPracticeBatch(practiceRows),
+      api.upsertConversationsBatch(conversationRows),
+    ])
+    if (settled[0].status === 'fulfilled') {
+      practiceFailed = settled[0].value
+    } else {
+      console.warn('[TechCloud] practice batch 网络失败', settled[0].reason)
+    }
+    if (settled[1].status === 'fulfilled') {
+      convFailed = settled[1].value
+    } else {
+      console.warn('[TechCloud] conversations batch 网络失败', settled[1].reason)
     }
 
+    // 即使两批全失败，也继续处理成功/失败的统计
     // 成功行：清队列 + 推进 lastSyncedAt
     const successPractice = practiceRows.map((r) => r.question_id).filter((qid) => !practiceFailed.includes(qid))
     const successConv = conversationRows.map((r) => r.question_id).filter((qid) => !convFailed.includes(qid))
@@ -255,6 +274,9 @@ function create(adapter: CloudStoreAdapter) {
       setStatus({ kind: 'partial', lastSyncedAt: sync.state.value.lastSyncedAt ?? Date.now(), failedCount: totalFailed })
     } else {
       setStatus({ kind: 'ok', lastSyncedAt: sync.state.value.lastSyncedAt ?? Date.now() })
+    }
+    } finally {
+      pushing.value = false
     }
   }
 
@@ -354,10 +376,12 @@ function create(adapter: CloudStoreAdapter) {
   // ---------- 懒加载 ----------
 
   async function loadPracticeDetail(qid: string): Promise<void> {
+    const uid = adapter.userId()
+    if (!uid) return
     const local = adapter.getPractice(qid)
-    if (local && local.answer && local.notes) return // 两项都有详情才跳过
+    if (local && local.answer && local.notes) return
     try {
-      const row = await api.fetchPracticeDetail(qid)
+      const row = await api.fetchPracticeDetail(qid, uid)
       if (row) {
         adapter.setPractice(qid, {
           mastery: row.mastery,
@@ -367,15 +391,17 @@ function create(adapter: CloudStoreAdapter) {
         })
       }
     } catch {
-      // ignore
+      console.warn('[TechCloud] loadPracticeDetail failed', qid)
     }
   }
 
   async function loadConversationDetail(qid: string): Promise<void> {
+    const uid = adapter.userId()
+    if (!uid) return
     const local = adapter.getConversation(qid)
     if (local && local.conversations.length > 0) return
     try {
-      const row = await api.fetchConversationsDetail(qid)
+      const row = await api.fetchConversationsDetail(qid, uid)
       if (row) {
         adapter.setConversation(qid, {
           conversations: row.conversations,
@@ -383,7 +409,7 @@ function create(adapter: CloudStoreAdapter) {
         })
       }
     } catch {
-      // ignore
+      console.warn('[TechCloud] loadConversationDetail failed', qid)
     }
   }
 
@@ -404,36 +430,51 @@ function create(adapter: CloudStoreAdapter) {
     // debounce flush 留给调用方
   }
 
-  function flushSoon(): void {
-    if (typeof window === 'undefined') return
-    if (!sync.state.value.enabled) return
-    if (!adapter.userId()) return
-    void push()
-  }
-
   // ---------- 事件挂载 ----------
 
+  // 存储 handler 引用，使 removeEventListener 可匹配
+  const onlineHandler = () => {
+    online.value = true
+    void flushPending()
+  }
+  const offlineHandler = () => {
+    online.value = false
+    setStatus({ kind: 'offline', lastSyncedAt: sync.state.value.lastSyncedAt })
+  }
+
+  // ---------- 多 tab 协调 ----------
+
+  /** 实例唯一标识，用于 BroadcastChannel 过滤自身消息 */
+  const instanceId = `sync-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+  let bc: BroadcastChannel | null = null
+
   if (typeof window !== 'undefined') {
-    window.addEventListener('online', () => {
-      online.value = true
-      void flushPending()
-    })
-    window.addEventListener('offline', () => {
-      online.value = false
-      setStatus({ kind: 'offline', lastSyncedAt: sync.state.value.lastSyncedAt })
-    })
+    window.addEventListener('online', onlineHandler)
+    window.addEventListener('offline', offlineHandler)
 
     // 多 tab 协调
     if (typeof BroadcastChannel !== 'undefined') {
       try {
-        const ch = new BroadcastChannel('tech-interview-sync')
-        ch.onmessage = (e) => {
-          if (e.data === 'pull-then-push') void pullThenPush()
+        bc = new BroadcastChannel('tech-interview-sync')
+        bc.onmessage = (e) => {
+          if (e.data?.type === 'pull-then-push' && e.data?.sender !== instanceId) {
+            void pullThenPush()
+          }
         }
       } catch {
-        // BroadcastChannel 不可用时退化
+        console.warn('[TechCloud] BroadcastChannel 不可用，多 tab 协调退化')
       }
     }
+  }
+
+  /** 销毁：清理事件监听、BroadcastChannel */
+  function destroy() {
+    if (typeof window !== 'undefined') {
+      window.removeEventListener('online', onlineHandler)
+      window.removeEventListener('offline', offlineHandler)
+    }
+    bc?.close()
+    bc = null
   }
 
   return {
@@ -445,10 +486,10 @@ function create(adapter: CloudStoreAdapter) {
     flushPending,
     resolveConflict,
     schedulePush,
-    flushSoon,
     loadPracticeDetail,
     loadConversationDetail,
     loadAiAnswerDetail,
+    destroy,
     enable: sync.enable,
     disable: sync.disable,
     sync,

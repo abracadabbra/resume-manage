@@ -22,6 +22,11 @@ export const useAuthStore = defineStore('auth', () => {
   const email = ref<string | null>(null)
   const isConfigured = ref<boolean>(Boolean(import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY))
 
+  /** 用于测试/HMR 时清理 onAuthStateChange 订阅 */
+  let _cleanup: (() => void) | null = null
+
+  let subInited = false
+
   async function init() {
     try {
       const { data } = await getSession()
@@ -31,24 +36,28 @@ export const useAuthStore = defineStore('auth', () => {
         email.value = user.email ?? null
       }
     } catch {
-      // 没配置 SUPABASE 或离线：保持未登录态
+      console.warn('[Auth] 初始化 session 失败（Supabase 未配置或离线）')
     }
 
-    if (isConfigured.value && typeof window !== 'undefined') {
+    if (!subInited && isConfigured.value && typeof window !== 'undefined') {
+      subInited = true
+      // 清除旧订阅（HMR 场景）
+      _cleanup?.()
+
       try {
-        // 动态 import 拿到 client（避免在测试 / 无配置时抛错）
         const url = import.meta.env.VITE_SUPABASE_URL
         const key = import.meta.env.VITE_SUPABASE_ANON_KEY
         if (!url || !key) return
         const { createClient } = await import('@supabase/supabase-js')
         const client = createClient(url, key)
-        client.auth.onAuthStateChange((_event, session) => {
+        const { data: sub } = client.auth.onAuthStateChange((_event, session) => {
           const u = session?.user
           userId.value = u?.id ?? null
           email.value = u?.email ?? null
         })
+        _cleanup = () => sub.subscription.unsubscribe()
       } catch {
-        // ignore
+        console.warn('[Auth] onAuthStateChange 订阅创建失败')
       }
     }
   }
@@ -77,6 +86,13 @@ export const useAuthStore = defineStore('auth', () => {
     await svcSignOut()
     userId.value = null
     email.value = null
+    dispose()
+  }
+
+  /** 清理 onAuthStateChange 订阅（组件卸载时调用） */
+  function dispose() {
+    _cleanup?.()
+    _cleanup = null
   }
 
   return {
@@ -87,5 +103,6 @@ export const useAuthStore = defineStore('auth', () => {
     signIn,
     signUp,
     signOut,
+    dispose,
   }
 })

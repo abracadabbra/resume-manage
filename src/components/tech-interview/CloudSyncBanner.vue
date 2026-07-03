@@ -49,6 +49,12 @@ function formatTime(ms: number): string {
 async function handleSync() {
   await store.cloud.pullThenPush()
 }
+
+async function handleSignOut() {
+  await auth.signOut()
+  // 登出后清理同步状态（下次登录时重新初始化）
+  localStorage.removeItem('tech-interview-sync-state.json')
+}
 </script>
 
 <template>
@@ -83,7 +89,7 @@ async function handleSync() {
       <button class="btn" :disabled="isSyncing" @click="handleSync">
         立即同步
       </button>
-      <button class="btn btn-link" @click="auth.signOut()">登出</button>
+      <button class="btn btn-link" @click="handleSignOut">登出</button>
     </div>
   </div>
 
