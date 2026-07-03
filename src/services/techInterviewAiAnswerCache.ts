@@ -111,7 +111,7 @@ export async function getCachedAiAnswers(questionIds: string[]): Promise<(string
     try {
       const tx = db.transaction(STORE_NAME, 'readonly')
       const store = tx.objectStore(STORE_NAME)
-      const results: (string | null)[] = Array.from({ length: questionIds.length }).fill(null)
+      const results: (string | null)[] = Array.from<string | null>({ length: questionIds.length }).fill(null)
       let pending = questionIds.length
 
       const finalize = () => {
