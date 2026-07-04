@@ -131,12 +131,31 @@ function moveDown(key: string) {
   store.moveModule(key, 'down')
 }
 
+function handleKeydown(e: KeyboardEvent) {
+  const mod = e.ctrlKey || e.metaKey
+  if (!mod) return
+  const key = e.key.toLowerCase()
+  if (key === 'z') {
+    e.preventDefault()
+    if (e.shiftKey) {
+      store.redo()
+    } else {
+      store.undo()
+    }
+  } else if (key === 'y') {
+    e.preventDefault()
+    store.redo()
+  }
+}
+
 onMounted(() => {
   document.addEventListener('mousedown', handleDocumentPointerDown)
+  document.addEventListener('keydown', handleKeydown)
 })
 
 onUnmounted(() => {
   document.removeEventListener('mousedown', handleDocumentPointerDown)
+  document.removeEventListener('keydown', handleKeydown)
 })
 </script>
 
@@ -144,20 +163,48 @@ onUnmounted(() => {
   <main class="editor-panel">
     <div class="editor-toolbar">
       <input v-model="searchValue" class="search-input" placeholder="搜索模块：基本信息 / 教育经历 / 专业技能" />
-      <span
-        class="chip"
-        :class="{ 'chip-pending': isAutoSavePending, 'chip-saving': store.isSaving }"
-        :title="autoSaveChipText"
-        :aria-label="autoSaveChipText"
-        role="status"
-        aria-live="polite"
-      >
-        <span v-if="store.isSaving" class="chip-loading" aria-hidden="true"></span>
-        <svg v-else class="chip-status-icon" viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M12 7v5l3 2" />
-          <circle cx="12" cy="12" r="8" />
-        </svg>
-      </span>
+      <div class="toolbar-actions">
+        <button
+          class="icon-btn"
+          type="button"
+          :disabled="!store.canUndo"
+          aria-label="撤销"
+          title="撤销 (Ctrl+Z)"
+          @click="store.undo()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M9 14L4 9l5-5" />
+            <path d="M4 9h11a5 5 0 0 1 0 10h-3" />
+          </svg>
+        </button>
+        <button
+          class="icon-btn"
+          type="button"
+          :disabled="!store.canRedo"
+          aria-label="重做"
+          title="重做 (Ctrl+Shift+Z)"
+          @click="store.redo()"
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M15 14l5-5-5-5" />
+            <path d="M20 9H9a5 5 0 0 0 0 10h3" />
+          </svg>
+        </button>
+        <span
+          class="chip"
+          :class="{ 'chip-pending': isAutoSavePending, 'chip-saving': store.isSaving }"
+          :title="autoSaveChipText"
+          :aria-label="autoSaveChipText"
+          role="status"
+          aria-live="polite"
+        >
+          <span v-if="store.isSaving" class="chip-loading" aria-hidden="true"></span>
+          <svg v-else class="chip-status-icon" viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M12 7v5l3 2" />
+            <circle cx="12" cy="12" r="8" />
+          </svg>
+        </span>
+      </div>
     </div>
 
     <div ref="moduleMenuRef" class="floating-tools">
@@ -336,6 +383,48 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 10px;
+}
+
+.toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.icon-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 1px solid #d8cdbd;
+  border-radius: 8px;
+  background: #fff;
+  color: #6b5d4f;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  background: #f5efe5;
+  border-color: #b7633b;
+  color: #b7633b;
+}
+
+.icon-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.icon-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .search-input {

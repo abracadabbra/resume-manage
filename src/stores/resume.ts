@@ -1,11 +1,12 @@
 import { defineStore } from 'pinia'
-import { reactive, ref } from 'vue'
+import { computed, nextTick, reactive, ref, watch } from 'vue'
 import { normalizeResumeTemplateKey, type ResumeTemplateKey } from '@/templates/resume'
 import {
   applyResumeData,
   createResumeDataSnapshot,
   loadResumeDataFromStorage,
   saveResumeDataToStorage,
+  type ResumeDraftData,
 } from './resumePersistence'
 import { createResumeCloudManager, resumeCloudApi, type ResumeRecord } from './resumeCloud'
 import type { SyncConflict } from './syncConflict'
@@ -453,6 +454,75 @@ export const useResumeStore = defineStore('resume', () => {
     onSave: () => saveToStorage('auto'),
   })
 
+  // ===== Undo / Redo =====
+  const HISTORY_MAX = 50
+  const HISTORY_DEBOUNCE_MS = 600
+  const past = ref<ResumeDraftData[]>([])
+  const future = ref<ResumeDraftData[]>([])
+  const canUndo = computed(() => past.value.length > 0)
+  const canRedo = computed(() => future.value.length > 0)
+  let isApplyingHistory = false
+  let historyTimer: ReturnType<typeof setTimeout> | null = null
+
+  function scheduleHistorySnapshot() {
+    if (isApplyingHistory) return
+    if (historyTimer) clearTimeout(historyTimer)
+    historyTimer = setTimeout(() => {
+      historyTimer = null
+      if (isApplyingHistory) return
+      const snapshot = createResumeDataSnapshot(resumeState)
+      past.value.push(snapshot)
+      if (past.value.length > HISTORY_MAX) {
+        past.value.shift()
+      }
+      future.value = []
+    }, HISTORY_DEBOUNCE_MS)
+  }
+
+  watch(
+    [
+      () => resumeState.modules,
+      () => resumeState.basicInfo,
+      () => resumeState.educationList,
+      () => resumeState.workList,
+      () => resumeState.projectList,
+      () => resumeState.awardList,
+      () => resumeState.skills.value,
+      () => resumeState.certificate.value,
+      () => resumeState.selfIntro.value,
+      () => resumeState.selectedTemplateKey.value,
+    ],
+    () => scheduleHistorySnapshot(),
+    { deep: true },
+  )
+
+  function undo() {
+    if (past.value.length === 0 || isApplyingHistory) return
+    isApplyingHistory = true
+    const current = createResumeDataSnapshot(resumeState)
+    const prev = past.value.pop()!
+    future.value.push(current)
+    applyResumeData(resumeState, prev, normalizeResumeTemplateKey)
+    historyTimer = null
+    saveToStorage('manual')
+    nextTick(() => {
+      isApplyingHistory = false
+    })
+  }
+
+  function redo() {
+    if (future.value.length === 0 || isApplyingHistory) return
+    isApplyingHistory = true
+    const current = createResumeDataSnapshot(resumeState)
+    const next = future.value.pop()!
+    past.value.push(current)
+    applyResumeData(resumeState, next, normalizeResumeTemplateKey)
+    saveToStorage('manual')
+    nextTick(() => {
+      isApplyingHistory = false
+    })
+  }
+
   return {
     modules,
     selectedTemplateKey,
@@ -488,6 +558,10 @@ export const useResumeStore = defineStore('resume', () => {
     lastSavedAt,
     lastSaveMode,
     isSaving,
+    canUndo,
+    canRedo,
+    undo,
+    redo,
     isLoggedIn,
     userId,
     currentResumeId,
