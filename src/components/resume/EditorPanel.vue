@@ -28,7 +28,7 @@ const showAiConfig = ref(false)
 const moduleMenuOpen = ref(false)
 const moduleMenuRef = ref<HTMLElement | null>(null)
 
-const { completionPercent } = useModuleCompletion(store)
+const { moduleCompletion, completionPercent } = useModuleCompletion(store)
 const {
   draggingModuleKey,
   dragOverModuleKey,
@@ -130,6 +130,16 @@ function moveUp(key: string) {
 
 function moveDown(key: string) {
   store.moveModule(key, 'down')
+}
+
+function moduleCompletionPercent(key: string): number {
+  return Math.round((moduleCompletion.value[key] ?? 0) * 100)
+}
+
+function moduleCompletionLevel(percent: number): 'good' | 'fair' | 'weak' {
+  if (percent >= 70) return 'good'
+  if (percent >= 40) return 'fair'
+  return 'weak'
 }
 
 function handleKeydown(e: KeyboardEvent) {
@@ -341,6 +351,20 @@ onUnmounted(() => {
 	              <span class="module-head-title">{{ mod.label }}</span>
 	            </div>
             <div class="module-head-right">
+              <span
+                v-if="mod.visible"
+                class="module-completion"
+                :class="`level-${moduleCompletionLevel(moduleCompletionPercent(mod.key))}`"
+                :title="`模块完整度 ${moduleCompletionPercent(mod.key)}%`"
+              >
+                <span class="completion-text">{{ moduleCompletionPercent(mod.key) }}%</span>
+                <span class="completion-bar">
+                  <span
+                    class="completion-bar-fill"
+                    :style="{ width: moduleCompletionPercent(mod.key) + '%' }"
+                  ></span>
+                </span>
+              </span>
               <span v-if="!mod.visible" class="disabled-tag">已关闭</span>
               <span class="expand-text">{{ expanded[mod.key] && mod.visible ? '收起' : '展开' }} ▸</span>
             </div>
@@ -1010,6 +1034,59 @@ onUnmounted(() => {
   gap: 8px;
 }
 
+.module-completion {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.completion-text {
+  font-size: 11px;
+  font-weight: 600;
+  min-width: 28px;
+  text-align: right;
+}
+
+.completion-bar {
+  display: inline-block;
+  width: 40px;
+  height: 4px;
+  border-radius: 2px;
+  background: #efe4d8;
+  overflow: hidden;
+}
+
+.completion-bar-fill {
+  display: block;
+  height: 100%;
+  border-radius: 2px;
+  transition: width 0.25s ease;
+}
+
+.module-completion.level-good .completion-text {
+  color: #2b7a45;
+}
+
+.module-completion.level-good .completion-bar-fill {
+  background: #2b7a45;
+}
+
+.module-completion.level-fair .completion-text {
+  color: #b27d12;
+}
+
+.module-completion.level-fair .completion-bar-fill {
+  background: #b27d12;
+}
+
+.module-completion.level-weak .completion-text {
+  color: #b74a30;
+}
+
+.module-completion.level-weak .completion-bar-fill {
+  background: #b74a30;
+}
+
 .order-actions {
   display: inline-flex;
   align-items: center;
@@ -1106,6 +1183,10 @@ onUnmounted(() => {
 
 @container (max-width: 560px) {
   .chip {
+    display: none;
+  }
+
+  .module-completion {
     display: none;
   }
 
