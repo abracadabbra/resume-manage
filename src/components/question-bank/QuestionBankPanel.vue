@@ -14,6 +14,7 @@ import QuestionDetail from './QuestionDetail.vue'
 import QuestionAdder from './QuestionAdder.vue'
 import ProjectQuestionGenerator from './ProjectQuestionGenerator.vue'
 import ResumeQuestionGenerator from './ResumeQuestionGenerator.vue'
+import AnswerScorer from './AnswerScorer.vue'
 
 const store = useQuestionBankStore()
 const resumeStore = useResumeStore()
@@ -292,6 +293,7 @@ onUnmounted(() => {
       <div class="generator-dock">
         <ResumeQuestionGenerator />
         <ProjectQuestionGenerator />
+        <AnswerScorer />
       </div>
       <QuestionAdder />
             <div class="bank-body">
