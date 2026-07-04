@@ -16,6 +16,7 @@ import { useModuleDragOrder } from './composables/useModuleDragOrder'
 import { useAutoSaveStatus } from './composables/useAutoSaveStatus'
 import { useResumeJsonIO } from './composables/useResumeJsonIO'
 import ResumeHealthCheck from './ResumeHealthCheck.vue'
+import ResumeVersionManager from './ResumeVersionManager.vue'
 
 const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
 const AiOptimizePanel = defineAsyncComponent(() => import('@/components/ai/AiOptimizePanel.vue'))
@@ -341,6 +342,7 @@ onUnmounted(() => {
     </div>
 
     <ResumeHealthCheck />
+    <ResumeVersionManager />
 
     <section class="info-editor">
       <div class="info-editor-header">
