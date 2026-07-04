@@ -18,6 +18,7 @@ import { useResumeJsonIO } from './composables/useResumeJsonIO'
 import ResumeHealthCheck from './ResumeHealthCheck.vue'
 import ResumeVersionManager from './ResumeVersionManager.vue'
 import AtsCheck from './AtsCheck.vue'
+import SkillRadar from './SkillRadar.vue'
 
 const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
 const AiOptimizePanel = defineAsyncComponent(() => import('@/components/ai/AiOptimizePanel.vue'))
@@ -344,6 +345,7 @@ onUnmounted(() => {
 
     <ResumeHealthCheck />
     <AtsCheck />
+    <SkillRadar />
     <ResumeVersionManager />
 
     <section class="info-editor">
