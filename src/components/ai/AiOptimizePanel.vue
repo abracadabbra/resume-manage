@@ -52,6 +52,8 @@ const {
   handleApply,
   handleUndoApply,
   resetAppliedModule,
+  optimizedSections,
+  hasSectionDiff,
 } = useApplyOptimizedContent({
   selectedModule,
   resolvedOptimizedContent,
@@ -111,6 +113,8 @@ function handleClose() {
           :can-apply-selected-module="canApplySelectedModule"
           :can-undo-selected-module="canUndoSelectedModule"
           :is-applied="isSelectedModuleApplied"
+          :optimized-sections="optimizedSections"
+          :has-section-diff="hasSectionDiff"
           @apply="handleApply"
           @undo="handleUndoApply"
         />

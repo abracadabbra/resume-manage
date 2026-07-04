@@ -1,5 +1,8 @@
 <script setup lang="ts">
-defineProps<{
+import { ref, watch } from 'vue'
+import type { SectionDiff } from './useApplyOptimizedContent'
+
+const props = defineProps<{
   errorMsg: string
   isLoading: boolean
   streamText: string
@@ -11,12 +14,29 @@ defineProps<{
   canApplySelectedModule: boolean
   canUndoSelectedModule: boolean
   isApplied: boolean
+  optimizedSections: SectionDiff[]
+  hasSectionDiff: boolean
 }>()
 
 const emit = defineEmits<{
   (e: 'apply'): void
   (e: 'undo'): void
 }>()
+
+const showDiff = ref(false)
+
+// 切换模块或重新优化时重置对比视图
+watch(
+  () => [props.optimizedSections, props.isDone],
+  () => {
+    if (props.hasSectionDiff && props.isDone) {
+      showDiff.value = true
+    } else {
+      showDiff.value = false
+    }
+  },
+  { immediate: true },
+)
 </script>
 
 <template>
@@ -62,6 +82,18 @@ const emit = defineEmits<{
         </h4>
         <div class="result-card-actions">
           <button
+            v-if="isDone && hasSectionDiff"
+            class="btn-toggle-diff"
+            :class="{ active: showDiff }"
+            type="button"
+            @click="showDiff = !showDiff"
+          >
+            <svg class="icon-xs" viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M9 3v18M15 3v18M3 9h18M3 15h18" />
+            </svg>
+            <span>{{ showDiff ? '收起对比' : '逐段对比' }}</span>
+          </button>
+          <button
             v-if="isDone && canApplySelectedModule && !isApplied"
             class="btn-apply"
             @click="emit('apply')"
@@ -87,6 +119,59 @@ const emit = defineEmits<{
         </div>
       </div>
       <div class="result-content markdown-content" v-safe-html="optimizedHtml"></div>
+    </div>
+
+    <div v-if="isDone && showDiff && hasSectionDiff" class="diff-sections">
+      <div
+        v-for="section in optimizedSections"
+        :key="`${section.type}-${section.index}`"
+        class="diff-card"
+      >
+        <div class="diff-card-header">
+          <span class="diff-card-title">{{ section.title }}</span>
+          <span class="diff-card-badge">第 {{ section.index + 1 }} 段</span>
+        </div>
+        <template v-if="section.type === 'work'">
+          <div class="diff-row">
+            <div class="diff-col diff-col-original">
+              <div class="diff-col-label">原始</div>
+              <div class="diff-col-content markdown-content" v-safe-html="section.originalHtml || '<p class=\'diff-empty\'>（空）</p>'"></div>
+            </div>
+            <div class="diff-col diff-col-optimized">
+              <div class="diff-col-label">优化后</div>
+              <div class="diff-col-content markdown-content" v-safe-html="section.optimizedHtml"></div>
+            </div>
+          </div>
+        </template>
+        <template v-else>
+          <div v-if="section.optimizedIntroHtml" class="diff-block">
+            <div class="diff-block-label">项目介绍</div>
+            <div class="diff-row">
+              <div class="diff-col diff-col-original">
+                <div class="diff-col-label">原始</div>
+                <div class="diff-col-content markdown-content" v-safe-html="section.originalIntroHtml || '<p class=\'diff-empty\'>（空）</p>'"></div>
+              </div>
+              <div class="diff-col diff-col-optimized">
+                <div class="diff-col-label">优化后</div>
+                <div class="diff-col-content markdown-content" v-safe-html="section.optimizedIntroHtml"></div>
+              </div>
+            </div>
+          </div>
+          <div v-if="section.optimizedMainWorkHtml" class="diff-block">
+            <div class="diff-block-label">主要工作</div>
+            <div class="diff-row">
+              <div class="diff-col diff-col-original">
+                <div class="diff-col-label">原始</div>
+                <div class="diff-col-content markdown-content" v-safe-html="section.originalMainWorkHtml || '<p class=\'diff-empty\'>（空）</p>'"></div>
+              </div>
+              <div class="diff-col diff-col-optimized">
+                <div class="diff-col-label">优化后</div>
+                <div class="diff-col-content markdown-content" v-safe-html="section.optimizedMainWorkHtml"></div>
+              </div>
+            </div>
+          </div>
+        </template>
+      </div>
     </div>
 
     <span v-if="isLoading && streamText" class="stream-cursor">▌</span>
@@ -325,6 +410,152 @@ const emit = defineEmits<{
   padding: 4px 10px;
   border-radius: 6px;
   background: #fff3eb;
+}
+
+.btn-toggle-diff {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid #ddd2c6;
+  border-radius: 7px;
+  background: #fff;
+  color: #5c4f44;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+.btn-toggle-diff:hover {
+  border-color: #d97745;
+  color: #d97745;
+}
+
+.btn-toggle-diff.active {
+  background: #fff3eb;
+  border-color: #d97745;
+  color: #d97745;
+}
+
+.diff-sections {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.diff-card {
+  border: 1px solid #e9ded0;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.diff-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  background: #faf7f4;
+  border-bottom: 1px solid #e9ded0;
+}
+
+.diff-card-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #2d2521;
+}
+
+.diff-card-badge {
+  font-size: 11px;
+  color: #8a7461;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: #f0e8db;
+}
+
+.diff-block {
+  padding: 12px 14px;
+}
+
+.diff-block-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #6b5d4f;
+  margin-bottom: 8px;
+  padding-bottom: 4px;
+  border-bottom: 1px dashed #e0d5c5;
+}
+
+.diff-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.diff-col {
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid #ebe3d6;
+}
+
+.diff-col-original {
+  background: #faf8f5;
+}
+
+.diff-col-optimized {
+  background: #f5fbf5;
+  border-color: #c5e5c5;
+}
+
+.diff-col-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a7461;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.diff-col-optimized .diff-col-label {
+  color: #4a7a4a;
+  background: rgba(80, 160, 80, 0.06);
+}
+
+.diff-col-content {
+  padding: 8px 10px;
+  font-size: 12px;
+  line-height: 1.6;
+  color: #3d3530;
+  word-break: break-word;
+  max-height: 280px;
+  overflow-y: auto;
+}
+
+.diff-col-content :deep(p) {
+  margin: 0 0 6px;
+}
+
+.diff-col-content :deep(ol),
+.diff-col-content :deep(ul) {
+  margin: 0 0 6px;
+  padding-left: 18px;
+}
+
+.diff-col-content :deep(li) {
+  margin-bottom: 4px;
+}
+
+.diff-col-content :deep(strong) {
+  color: #2d2521;
+  font-weight: 700;
+}
+
+.diff-empty {
+  color: #b5a89b;
+  font-style: italic;
+  font-size: 12px;
 }
 
 .stream-cursor {

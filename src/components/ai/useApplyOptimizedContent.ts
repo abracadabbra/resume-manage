@@ -11,6 +11,26 @@ interface UseApplyOptimizedContentOptions {
   setErrorMessage: (message: string) => void
 }
 
+export interface WorkSectionDiff {
+  type: 'work'
+  index: number
+  title: string
+  originalHtml: string
+  optimizedHtml: string
+}
+
+export interface ProjectSectionDiff {
+  type: 'project'
+  index: number
+  title: string
+  originalIntroHtml: string
+  optimizedIntroHtml: string
+  originalMainWorkHtml: string
+  optimizedMainWorkHtml: string
+}
+
+export type SectionDiff = WorkSectionDiff | ProjectSectionDiff
+
 type ApplyUndoSnapshot = {
   previousContent: string
   previousWorkDescriptions?: string[]
@@ -1154,6 +1174,79 @@ export function useApplyOptimizedContent(options: UseApplyOptimizedContentOption
     appliedModules.value.delete(moduleKey)
   }
 
+  // ===== 逐段对比视图 =====
+  const optimizedSections = computed<SectionDiff[]>(() => {
+    const key = selectedModule.value
+    const content = resolvedOptimizedContent.value
+    if (!content || !key) return []
+
+    const cleaned = removeLeadingModuleTitle(content, key)
+    const normalized = normalizeMarkdownListContent(cleaned)
+    const sanitized = sanitizeMarkdownForRender(normalized)
+
+    if (key === 'workExperience') {
+      const sections = parseWorkOptimizedContent(sanitized, resumeStore.workList)
+      const result: WorkSectionDiff[] = []
+      const maxCount = Math.min(sections.length, resumeStore.workList.length)
+      for (let i = 0; i < maxCount; i++) {
+        const section = sections[i]?.trim()
+        if (!section) continue
+        const work = resumeStore.workList[i]
+        if (!work) continue
+        const optimizedHtml = renderWorkSectionWithOriginalStyle(section, work.description)
+        if (!optimizedHtml.trim()) continue
+        result.push({
+          type: 'work',
+          index: i,
+          title: work.company || `工作经历 ${i + 1}`,
+          originalHtml: work.description,
+          optimizedHtml,
+        })
+      }
+      return result
+    }
+
+    if (key === 'projectExperience') {
+      const sections = parseProjectOptimizedSections(sanitized, resumeStore.projectList)
+      const result: ProjectSectionDiff[] = []
+      const maxCount = Math.min(sections.length, resumeStore.projectList.length)
+      for (let i = 0; i < maxCount; i++) {
+        const section = sections[i]
+        const project = resumeStore.projectList[i]
+        if (!section || !project) continue
+
+        let optimizedIntro = ''
+        if (section.introduction) {
+          const introSingle = normalizeProjectIntroductionSingleLine(section.introduction)
+          if (introSingle) {
+            optimizedIntro = markdown.render(introSingle)
+          }
+        }
+        let optimizedMainWork = ''
+        if (section.mainWork) {
+          const enhanced = enhanceProjectMainWorkBold(section.mainWork)
+          optimizedMainWork = renderProjectMainWorkWithOriginalStyle(enhanced, project.mainWork)
+        }
+        if (!optimizedIntro && !optimizedMainWork) continue
+
+        result.push({
+          type: 'project',
+          index: i,
+          title: project.name || `项目经历 ${i + 1}`,
+          originalIntroHtml: project.introduction,
+          optimizedIntroHtml: optimizedIntro,
+          originalMainWorkHtml: project.mainWork,
+          optimizedMainWorkHtml: optimizedMainWork,
+        })
+      }
+      return result
+    }
+
+    return []
+  })
+
+  const hasSectionDiff = computed(() => optimizedSections.value.length > 0)
+
   return {
     canApplySelectedModule,
     isSelectedModuleApplied,
@@ -1161,5 +1254,7 @@ export function useApplyOptimizedContent(options: UseApplyOptimizedContentOption
     handleApply,
     handleUndoApply,
     resetAppliedModule,
+    optimizedSections,
+    hasSectionDiff,
   }
 }
