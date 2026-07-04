@@ -7,6 +7,7 @@ import {
   type InterviewTurnScore,
   type ResumeSnapshot,
 } from '@/services/interviewService'
+import type { PreviousSessionDigestPrompt } from '@/services/prompts/interviewCandidatePrompt'
 import type { ChatMessage } from '@/components/ai/interview/types'
 
 interface AiConfigSnapshot {
@@ -25,6 +26,7 @@ interface UseInterviewSessionOptions {
   getAiConfig: () => AiConfigSnapshot
   openAiConfig: () => void
   onInterviewFinished: () => void
+  getPreviousDigest: () => PreviousSessionDigestPrompt | undefined
 }
 
 function newMessageId(): string {
@@ -127,6 +129,7 @@ export function useInterviewSession(options: UseInterviewSessionOptions) {
         durationMinutes: options.durationMinutes.value,
         elapsedSeconds: options.elapsedSeconds.value,
         memorySummary: memorySummary.value,
+        previousSessionDigest: command === 'start' ? options.getPreviousDigest() : undefined,
       }, undefined, {
         onAssistantReplyChunk(text) {
           updateAssistantMessageById(draftMessageId, text)

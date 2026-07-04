@@ -4,6 +4,7 @@ import AiConfigDialog from '@/components/ai/AiConfigDialog.vue'
 import InterviewSimulationPanel from '@/components/ai/interview/InterviewSimulationPanel.vue'
 import InterviewReviewQuestionPanel from '@/components/ai/interview/InterviewReviewQuestionPanel.vue'
 import InterviewTopbar from '@/components/ai/interview/InterviewTopbar.vue'
+import InterviewHistoryDrawer from '@/components/ai/interview/InterviewHistoryDrawer.vue'
 import ResumePreviewOverlay from '@/components/ai/interview/ResumePreviewOverlay.vue'
 import { useInterviewSession } from '@/components/ai/interview/useInterviewSession'
 import { useInterviewTimer } from '@/components/ai/interview/useInterviewTimer'
@@ -20,20 +21,42 @@ import {
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { useQuestionBankStore } from '@/stores/questionBank'
 import { useResumeStore } from '@/stores/resume'
+import { useInterviewHistoryStore } from '@/stores/interviewHistory'
 import type { InterviewMode, ResumeSnapshot } from '@/services/interviewService'
+import type { PreviousSessionDigestPrompt } from '@/services/prompts/interviewCandidatePrompt'
 
 const resumeStore = useResumeStore()
 const aiConfig = useAiConfigStore()
 const questionBankStore = useQuestionBankStore()
+const interviewHistoryStore = useInterviewHistoryStore()
 
 const showAiConfig = ref(false)
 const showResumePreview = ref(false)
+const showHistory = ref(false)
+const followUpEnabled = ref(true)
 const inputText = ref('')
 const isReviewQuestionLoading = ref(false)
 const reviewQuestionError = ref('')
 const reviewQuestionSuccess = ref('')
 const reviewQuestionOutput = ref('')
 const reviewQuestionResult = ref<InterviewReviewQuestionBatch | null>(null)
+
+// 阶段 2：跨会话记忆
+const hasPreviousSession = computed(
+  () => interviewHistoryStore.sortedSessions.length > 0
+)
+
+function getPreviousDigest(): PreviousSessionDigestPrompt | undefined {
+  if (!followUpEnabled.value) return undefined
+  const digest = interviewHistoryStore.getPreviousSessionDigest(mode.value)
+  if (!digest) return undefined
+  return {
+    improvements: digest.improvements,
+    lowScoreDimensions: digest.lowScoreDimensions,
+    weakTopics: digest.weakTopics,
+    lastTotalScore: digest.lastTotalScore,
+  }
+}
 
 const resumeSnapshot = computed<ResumeSnapshot>(() => ({
   basicInfo: resumeStore.basicInfo,
@@ -55,6 +78,7 @@ const {
   elapsedSeconds,
   sessionStarted,
   timerRunning,
+  startedAt,
   remainingSeconds,
   timerText,
   timerStatusText,
@@ -101,7 +125,18 @@ const {
   },
   onInterviewFinished() {
     pauseTimer()
+    // 保存面试记录
+    if (messages.value.length > 0) {
+      interviewHistoryStore.saveSession({
+        mode: mode.value,
+        startedAt: startedAt.value,
+        durationMinutes: durationMinutes.value,
+        finalEvaluation: finalEvaluation.value,
+        messages: messages.value,
+      })
+    }
   },
+  getPreviousDigest,
 })
 
 const {
@@ -305,9 +340,13 @@ onUnmounted(() => {
       :is-ai-configured="aiConfig.isConfigured"
       :model-name="aiConfig.modelName"
       :show-resume-preview="showResumePreview"
+      :follow-up-enabled="followUpEnabled"
+      :has-previous-session="hasPreviousSession"
       @switch-mode="handleModeSwitch"
       @open-config="showAiConfig = true"
       @toggle-resume-preview="showResumePreview = !showResumePreview"
+      @open-history="showHistory = true"
+      @toggle-follow-up="followUpEnabled = !followUpEnabled"
     />
 
     <div v-if="finalEvaluation" class="final-banner" :class="{ pass: finalEvaluation.passed, fail: !finalEvaluation.passed }">
@@ -361,6 +400,7 @@ onUnmounted(() => {
     </div>
 
     <AiConfigDialog v-if="showAiConfig" @close="showAiConfig = false" />
+    <InterviewHistoryDrawer v-if="showHistory" @close="showHistory = false" />
   </section>
 </template>
 

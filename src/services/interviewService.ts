@@ -1,7 +1,7 @@
 import type { AiConfig } from '@/stores/aiConfig'
 import type { BasicInfo, EducationEntry, ProjectEntry, WorkEntry } from '@/stores/resume'
 import { streamChatCompletion } from '@/services/aiClient'
-import { candidateModeSystemPrompt } from '@/services/prompts/interviewCandidatePrompt'
+import { candidateModeSystemPrompt, type PreviousSessionDigestPrompt } from '@/services/prompts/interviewCandidatePrompt'
 import { interviewerModeSystemPrompt } from '@/services/prompts/interviewInterviewerPrompt'
 import { stripHtml } from '@/services/htmlUtils'
 
@@ -67,6 +67,7 @@ export interface InterviewTurnRequest {
   durationMinutes: number
   elapsedSeconds: number
   memorySummary?: string
+  previousSessionDigest?: PreviousSessionDigestPrompt
 }
 
 export interface InterviewTurnStreamCallbacks {
@@ -384,8 +385,11 @@ export async function requestInterviewTurn(
 ): Promise<InterviewTurnResponse> {
   const systemPrompt =
     request.mode === 'candidate'
-      ? candidateModeSystemPrompt()
-      : interviewerModeSystemPrompt(request.resumeSnapshot.basicInfo.jobTitle?.trim() || '')
+      ? candidateModeSystemPrompt(request.previousSessionDigest)
+      : interviewerModeSystemPrompt(
+          request.resumeSnapshot.basicInfo.jobTitle?.trim() || '',
+          request.previousSessionDigest,
+        )
   const userCommandPrompt = buildUserCommandPrompt(request)
 
   const historyWindowSize = request.command === 'start' ? 4 : 8

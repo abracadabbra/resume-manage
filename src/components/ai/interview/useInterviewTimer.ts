@@ -5,6 +5,7 @@ export function useInterviewTimer(initialDurationMinutes = 60) {
   const elapsedSeconds = ref(0)
   const sessionStarted = ref(false)
   const timerRunning = ref(false)
+  const startedAt = ref(0)
 
   const totalSeconds = computed(() => Math.max(durationMinutes.value, 1) * 60)
   const remainingSeconds = computed(() => Math.max(totalSeconds.value - elapsedSeconds.value, 0))
@@ -33,6 +34,7 @@ export function useInterviewTimer(initialDurationMinutes = 60) {
   function startTimer() {
     sessionStarted.value = true
     timerRunning.value = true
+    startedAt.value = Date.now()
   }
 
   function pauseTimer() {
@@ -47,6 +49,7 @@ export function useInterviewTimer(initialDurationMinutes = 60) {
     elapsedSeconds.value = 0
     sessionStarted.value = false
     timerRunning.value = false
+    startedAt.value = 0
   }
 
   function tick() {
@@ -60,6 +63,7 @@ export function useInterviewTimer(initialDurationMinutes = 60) {
     elapsedSeconds,
     sessionStarted,
     timerRunning,
+    startedAt,
     remainingSeconds,
     timerText,
     timerStatusText,
