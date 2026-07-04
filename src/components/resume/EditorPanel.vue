@@ -14,6 +14,7 @@ import { getModuleIconPaths, MODULE_ICON_VIEWBOX } from '@/constants/moduleIcons
 import { useModuleCompletion } from './composables/useModuleCompletion'
 import { useModuleDragOrder } from './composables/useModuleDragOrder'
 import { useAutoSaveStatus } from './composables/useAutoSaveStatus'
+import ResumeHealthCheck from './ResumeHealthCheck.vue'
 
 const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
 const AiOptimizePanel = defineAsyncComponent(() => import('@/components/ai/AiOptimizePanel.vue'))
@@ -308,6 +309,8 @@ onUnmounted(() => {
         <p class="stat-value">{{ visibleCount }} / {{ store.modules.length }}</p>
       </div>
     </div>
+
+    <ResumeHealthCheck />
 
     <section class="info-editor">
       <div class="info-editor-header">
