@@ -14,6 +14,7 @@ import { getModuleIconPaths, MODULE_ICON_VIEWBOX } from '@/constants/moduleIcons
 import { useModuleCompletion } from './composables/useModuleCompletion'
 import { useModuleDragOrder } from './composables/useModuleDragOrder'
 import { useAutoSaveStatus } from './composables/useAutoSaveStatus'
+import { useResumeJsonIO } from './composables/useResumeJsonIO'
 import ResumeHealthCheck from './ResumeHealthCheck.vue'
 
 const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
@@ -38,6 +39,25 @@ const {
   handleSwitchDragEnd,
 } = useModuleDragOrder(store)
 const { isAutoSavePending, autoSaveChipText } = useAutoSaveStatus(store)
+const {
+  errorMsg: ioErrorMsg,
+  successMsg: ioSuccessMsg,
+  handleExport,
+  handleImport,
+} = useResumeJsonIO(store)
+const importFileInput = ref<HTMLInputElement | null>(null)
+
+function handleImportClick() {
+  importFileInput.value?.click()
+}
+
+async function handleFileChange(event: Event) {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (!file) return
+  await handleImport(file)
+  target.value = ''
+}
 
 function handleAiClick() {
   if (!aiConfig.isConfigured) {
@@ -326,12 +346,27 @@ onUnmounted(() => {
       <div class="info-editor-header">
         <h2 class="editor-title">信息编辑区</h2>
         <div class="editor-header-actions">
+          <button class="btn-io" type="button" @click="handleExport">导出 JSON</button>
+          <button class="btn-io" type="button" @click="handleImportClick">导入 JSON</button>
+          <input
+            ref="importFileInput"
+            type="file"
+            accept="application/json,.json"
+            class="hidden-file-input"
+            @change="handleFileChange"
+          />
           <button class="btn-save" @click="handleSave">保存草稿</button>
         </div>
       </div>
       <p class="editor-subtitle">模块顺序与模块开关一致，点击右侧可展开/收起</p>
       <transition name="fade">
         <p v-if="showSaved" class="save-hint">已保存</p>
+      </transition>
+      <transition name="fade">
+        <p v-if="ioSuccessMsg" class="io-hint io-success">{{ ioSuccessMsg }}</p>
+      </transition>
+      <transition name="fade">
+        <p v-if="ioErrorMsg" class="io-hint io-error">{{ ioErrorMsg }}</p>
       </transition>
 
       <div class="module-sections">
@@ -958,11 +993,48 @@ onUnmounted(() => {
   cursor: pointer;
 }
 
+.btn-io {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: 1px solid #ddcfbf;
+  background: #fff;
+  color: #2d2521;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.18s, color 0.18s;
+}
+
+.btn-io:hover {
+  border-color: #d97745;
+  color: #d97745;
+}
+
+.hidden-file-input {
+  display: none;
+}
+
 .save-hint {
   margin-top: 6px;
   color: #d97745;
   font-size: 12px;
   font-weight: 600;
+}
+
+.io-hint {
+  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.io-success {
+  color: #2b7a45;
+}
+
+.io-error {
+  color: #b74a30;
 }
 
 .module-sections {

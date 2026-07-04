@@ -570,6 +570,7 @@ export const useResumeStore = defineStore('resume', () => {
     cloudLastSyncedAt,
     cloudConflict,
     getSnapshot: getData,
+    loadSnapshot: loadData,
     login: cloudManager.login,
     register: cloudManager.register,
     logout: cloudManager.logout,
