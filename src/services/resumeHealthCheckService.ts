@@ -140,7 +140,12 @@ function normalizeSeverity(value: unknown): 'high' | 'medium' | 'low' {
 }
 
 export function parseResumeHealthCheckResult(raw: string): ResumeHealthCheckResult | null {
-  const parsed = JSON.parse(extractJsonPayload(raw)) as Record<string, unknown>
+  let parsed: Record<string, unknown>
+  try {
+    parsed = JSON.parse(extractJsonPayload(raw)) as Record<string, unknown>
+  } catch {
+    return null
+  }
 
   const moduleScores = normalizeStringRecordList(parsed.moduleScores, [
     'module',
