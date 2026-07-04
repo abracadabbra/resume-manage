@@ -17,6 +17,7 @@ import { useAutoSaveStatus } from './composables/useAutoSaveStatus'
 import { useResumeJsonIO } from './composables/useResumeJsonIO'
 import ResumeHealthCheck from './ResumeHealthCheck.vue'
 import ResumeVersionManager from './ResumeVersionManager.vue'
+import AtsCheck from './AtsCheck.vue'
 
 const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
 const AiOptimizePanel = defineAsyncComponent(() => import('@/components/ai/AiOptimizePanel.vue'))
@@ -342,6 +343,7 @@ onUnmounted(() => {
     </div>
 
     <ResumeHealthCheck />
+    <AtsCheck />
     <ResumeVersionManager />
 
     <section class="info-editor">
