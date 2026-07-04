@@ -4,11 +4,13 @@ import JdQuestionList from './JdQuestionList.vue'
 import JdQuestionDetail from './JdQuestionDetail.vue'
 import JdAdder from './JdAdder.vue'
 import JdQuestionGenerator from './JdQuestionGenerator.vue'
+import JdMatchScorer from './JdMatchScorer.vue'
 </script>
 
 <template>
   <div class="jd-special-panel">
     <JdQuestionGenerator />
+    <JdMatchScorer />
     <div class="panel-body">
       <JdSelector />
       <JdQuestionList />
