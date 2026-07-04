@@ -1,10 +1,153 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { useResumeStore } from '@/stores/resume'
+import { useAiConfigStore } from '@/stores/aiConfig'
 import { ref } from 'vue'
+import type { ProjectEntry } from '@/stores/resume'
 import RichEditor from '@/components/common/RichEditor.vue'
+import {
+  rewriteProjectByStar,
+  type ProjectStarRewriteResult,
+} from '@/services/projectStarRewriteService'
 
 const store = useResumeStore()
+const aiConfig = useAiConfigStore()
 const collapsed = ref(false)
+
+// 每个项目的 STAR 重写状态
+interface ProjectRewriteState {
+  isLoading: boolean
+  errorMsg: string
+  aiOutput: string
+  result: ProjectStarRewriteResult | null
+  // 应用前的快照，用于撤销
+  appliedSnapshot: { introduction: string; mainWork: string } | null
+  // 已应用的标记（用于显示"已应用"状态）
+  isApplied: boolean
+  abortController: AbortController | null
+}
+
+const rewriteStates = ref<Record<string, ProjectRewriteState>>({})
+
+function getState(projectId: string): ProjectRewriteState {
+  if (!rewriteStates.value[projectId]) {
+    rewriteStates.value[projectId] = {
+      isLoading: false,
+      errorMsg: '',
+      aiOutput: '',
+      result: null,
+      appliedSnapshot: null,
+      isApplied: false,
+      abortController: null,
+    }
+  }
+  return rewriteStates.value[projectId]
+}
+
+function hasProjectContent(project: ProjectEntry): boolean {
+  return Boolean(
+    project.name.trim() ||
+      project.role.trim() ||
+      project.introduction.trim() ||
+      project.mainWork.trim(),
+  )
+}
+
+async function handleRewrite(project: ProjectEntry) {
+  const state = getState(project.id)
+  if (state.isLoading) return
+
+  if (!hasProjectContent(project)) {
+    state.errorMsg = '请先填写项目名称、角色或主要工作。'
+    return
+  }
+  if (!aiConfig.isConfigured) {
+    state.errorMsg = '请先在 AI 设置里配置模型与密钥。'
+    return
+  }
+
+  state.isLoading = true
+  state.errorMsg = ''
+  state.result = null
+  state.aiOutput = ''
+  state.abortController = new AbortController()
+
+  await rewriteProjectByStar(
+    { project: { ...project } },
+    {
+      onChunk(text) {
+        state.aiOutput = text
+      },
+      onDone(result) {
+        state.result = result
+        state.isLoading = false
+        state.abortController = null
+      },
+      onError(error) {
+        state.errorMsg = error
+        state.isLoading = false
+        state.abortController = null
+      },
+    },
+    state.abortController.signal,
+  )
+}
+
+function handleCancel(projectId: string) {
+  const state = getState(projectId)
+  state.abortController?.abort()
+  state.abortController = null
+  state.isLoading = false
+}
+
+function handleApply(project: ProjectEntry) {
+  const state = getState(project.id)
+  if (!state.result) return
+
+  // 保存快照用于撤销
+  if (!state.appliedSnapshot) {
+    state.appliedSnapshot = {
+      introduction: project.introduction,
+      mainWork: project.mainWork,
+    }
+  }
+
+  project.introduction = state.result.introduction
+  project.mainWork = state.result.mainWork
+  state.isApplied = true
+}
+
+function handleUndo(project: ProjectEntry) {
+  const state = getState(project.id)
+  if (!state.appliedSnapshot) return
+
+  project.introduction = state.appliedSnapshot.introduction
+  project.mainWork = state.appliedSnapshot.mainWork
+  state.appliedSnapshot = null
+  state.isApplied = false
+}
+
+function handleDiscard(projectId: string) {
+  const state = getState(projectId)
+  handleCancel(projectId)
+  state.result = null
+  state.errorMsg = ''
+  state.aiOutput = ''
+  state.isApplied = false
+  state.appliedSnapshot = null
+}
+
+const EMPTY_PLACEHOLDER = '<p class="star-empty">（空）</p>'
+
+function getResultHtml(projectId: string, field: 'introduction' | 'mainWork'): string {
+  const state = getState(projectId)
+  if (!state.result) return EMPTY_PLACEHOLDER
+  const html = field === 'introduction' ? state.result.introduction : state.result.mainWork
+  return html || EMPTY_PLACEHOLDER
+}
+
+function getResultSummary(projectId: string): string {
+  return getState(projectId).result?.summary ?? ''
+}
 </script>
 
 <template>
@@ -83,12 +226,99 @@ const collapsed = ref(false)
           />
         </div>
         <div class="form-group form-group-full">
-          <label class="form-label">主要工作</label>
+          <div class="label-with-action">
+            <label class="form-label">主要工作</label>
+            <button
+              v-if="!getState(proj.id).result && !getState(proj.id).isLoading"
+              class="btn-star"
+              type="button"
+              :disabled="!hasProjectContent(proj)"
+              @click="handleRewrite(proj)"
+            >
+              AI STAR 化重写
+            </button>
+            <button
+              v-else-if="getState(proj.id).isLoading"
+              class="btn-star btn-star-cancel"
+              type="button"
+              @click="handleCancel(proj.id)"
+            >
+              取消生成
+            </button>
+            <button
+              v-else-if="getState(proj.id).result"
+              class="btn-star btn-star-secondary"
+              type="button"
+              @click="handleDiscard(proj.id)"
+            >
+              收起预览
+            </button>
+          </div>
           <RichEditor
             v-model="proj.mainWork"
             :rows="5"
             placeholder="描述你的职责、技术亮点和成果..."
           />
+        </div>
+
+        <div
+          v-if="getState(proj.id).errorMsg"
+          class="star-error"
+        >
+          {{ getState(proj.id).errorMsg }}
+        </div>
+
+        <div
+          v-if="getState(proj.id).isLoading && getState(proj.id).aiOutput"
+          class="star-preview"
+        >
+          <div class="star-preview-label">AI 生成中...</div>
+          <pre class="star-preview-content">{{ getState(proj.id).aiOutput }}</pre>
+        </div>
+
+        <div
+          v-if="getState(proj.id).result && !getState(proj.id).isLoading"
+          class="star-result"
+        >
+          <div class="star-result-header">
+            <span class="star-result-title">STAR 化重写预览</span>
+            <span class="star-result-summary">{{ getResultSummary(proj.id) }}</span>
+          </div>
+          <div class="star-diff">
+            <div class="star-diff-col">
+              <div class="star-diff-label">项目介绍（重写后）</div>
+              <div class="star-diff-content" v-html="getResultHtml(proj.id, 'introduction')"></div>
+            </div>
+            <div class="star-diff-col">
+              <div class="star-diff-label">主要工作（重写后）</div>
+              <div class="star-diff-content" v-html="getResultHtml(proj.id, 'mainWork')"></div>
+            </div>
+          </div>
+          <div class="star-actions">
+            <button
+              v-if="!getState(proj.id).isApplied"
+              class="btn-star btn-star-apply"
+              type="button"
+              @click="handleApply(proj)"
+            >
+              应用到项目
+            </button>
+            <button
+              v-else
+              class="btn-star btn-star-undo"
+              type="button"
+              @click="handleUndo(proj)"
+            >
+              撤销应用
+            </button>
+            <button
+              class="btn-star btn-star-secondary"
+              type="button"
+              @click="handleRewrite(proj)"
+            >
+              重新生成
+            </button>
+          </div>
         </div>
       </div>
 
@@ -272,27 +502,174 @@ const collapsed = ref(false)
   color: var(--gray-400);
 }
 
-.form-textarea {
-  width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  font-size: 0.88rem;
-  color: var(--text-primary);
-  background: white;
-  transition: all var(--transition-fast);
-  outline: none;
-  resize: vertical;
-  line-height: 1.6;
+.label-with-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
 }
 
-.form-textarea:focus {
-  border-color: var(--primary-400);
-  box-shadow: 0 0 0 3px var(--primary-50);
+.btn-star {
+  border: 1px solid #f0c7b0;
+  border-radius: 6px;
+  background: #fff;
+  color: #9a4f2f;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 10px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: border-color 0.15s, color 0.15s, background 0.15s;
 }
 
-.form-textarea::placeholder {
-  color: var(--gray-400);
+.btn-star:hover:not(:disabled) {
+  border-color: #d97745;
+  color: #d97745;
+}
+
+.btn-star:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn-star-cancel,
+.btn-star-undo {
+  border-color: #ddcfbf;
+  background: #f4eee8;
+  color: #6a5748;
+}
+
+.btn-star-secondary {
+  border-color: #ddcfbf;
+  background: #f4eee8;
+  color: #6a5748;
+}
+
+.btn-star-apply {
+  border: none;
+  background: #d97745;
+  color: #fff;
+}
+
+.btn-star-apply:hover {
+  background: #c96a3b;
+}
+
+.star-error {
+  margin-top: var(--spacing-sm);
+  padding: 8px 10px;
+  border: 1px solid #f0d2c8;
+  border-radius: 6px;
+  background: #fff1ec;
+  color: #b74a30;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.star-preview {
+  margin-top: var(--spacing-sm);
+  border: 1px solid #eadfd2;
+  border-radius: 6px;
+  background: #faf8f5;
+  padding: 10px;
+}
+
+.star-preview-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #8a7258;
+}
+
+.star-preview-content {
+  margin: 8px 0 0;
+  max-height: 160px;
+  overflow: auto;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #40362d;
+}
+
+.star-result {
+  margin-top: var(--spacing-sm);
+  border: 1px solid #eadfd2;
+  border-radius: 6px;
+  background: #faf8f5;
+  padding: 10px;
+}
+
+.star-result-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.star-result-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: #5f5448;
+}
+
+.star-result-summary {
+  font-size: 11px;
+  color: #8a7258;
+}
+
+.star-diff {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.star-diff-col {
+  border: 1px solid #eadfd2;
+  border-radius: 6px;
+  background: #fff;
+  padding: 8px 10px;
+}
+
+.star-diff-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: #7b6a5b;
+  margin-bottom: 6px;
+}
+
+.star-diff-content {
+  font-size: 12px;
+  line-height: 1.55;
+  color: #2d2521;
+  max-height: 220px;
+  overflow-y: auto;
+}
+
+.star-diff-content :deep(ul) {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.star-diff-content :deep(li) {
+  margin: 2px 0;
+}
+
+.star-diff-content :deep(strong) {
+  color: #9a4f2f;
+  font-weight: 700;
+}
+
+.star-empty {
+  color: #a08c7b;
+  font-style: italic;
+}
+
+.star-actions {
+  margin-top: 10px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 
 .btn-add {
@@ -320,5 +697,11 @@ const collapsed = ref(false)
 .btn-add-icon {
   font-size: 1.1rem;
   font-weight: 700;
+}
+
+@media (max-width: 720px) {
+  .star-diff {
+    grid-template-columns: 1fr;
+  }
 }
 </style>
