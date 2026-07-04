@@ -1,4 +1,4 @@
-﻿<script setup lang="ts">
+<script setup lang="ts">
 import { computed, defineAsyncComponent, onMounted, onUnmounted, reactive, ref, type Component } from 'vue'
 import { useResumeStore } from '@/stores/resume'
 import { useAiConfigStore } from '@/stores/aiConfig'
@@ -11,6 +11,9 @@ import ProjectExperienceEditor from './editors/ProjectExperienceEditor.vue'
 import AwardsEditor from './editors/AwardsEditor.vue'
 import SelfIntroEditor from './editors/SelfIntroEditor.vue'
 import { getModuleIconPaths, MODULE_ICON_VIEWBOX } from '@/constants/moduleIcons'
+import { useModuleCompletion } from './composables/useModuleCompletion'
+import { useModuleDragOrder } from './composables/useModuleDragOrder'
+import { useAutoSaveStatus } from './composables/useAutoSaveStatus'
 
 const AiConfigDialog = defineAsyncComponent(() => import('@/components/ai/AiConfigDialog.vue'))
 const AiOptimizePanel = defineAsyncComponent(() => import('@/components/ai/AiOptimizePanel.vue'))
@@ -23,9 +26,17 @@ const showAiPanel = ref(false)
 const showAiConfig = ref(false)
 const moduleMenuOpen = ref(false)
 const moduleMenuRef = ref<HTMLElement | null>(null)
-const draggingModuleKey = ref<string | null>(null)
-const dragOverModuleKey = ref<string | null>(null)
-const nowTick = ref(Date.now())
+
+const { completionPercent } = useModuleCompletion(store)
+const {
+  draggingModuleKey,
+  dragOverModuleKey,
+  handleSwitchDragStart,
+  handleSwitchDragOver,
+  handleSwitchDrop,
+  handleSwitchDragEnd,
+} = useModuleDragOrder(store)
+const { isAutoSavePending, autoSaveChipText } = useAutoSaveStatus(store)
 
 function handleAiClick() {
   if (!aiConfig.isConfigured) {
@@ -79,78 +90,6 @@ const filteredModules = computed(() =>
   store.modules.filter((m) => (searchKeyword.value ? m.label.includes(searchKeyword.value) : true))
 )
 
-function hasTextContent(value: string | undefined): boolean {
-  if (!value) return false
-  const text = value
-    .replace(/<[^>]*>/g, ' ')
-    .replace(/&nbsp;/gi, ' ')
-    .trim()
-  return text.length > 0
-}
-
-function countFilled(values: Array<string | undefined>): number {
-  return values.reduce((count, value) => count + (value?.trim() ? 1 : 0), 0)
-}
-
-function scoreByFilled(values: Array<string | undefined>): number {
-  if (values.length === 0) return 0
-  return countFilled(values) / values.length
-}
-
-const moduleCompletion = computed<Record<string, number>>(() => {
-  const basic = store.basicInfo
-
-  const basicInfoScore = scoreByFilled([
-    basic.name,
-    basic.phone,
-    basic.email,
-    basic.jobTitle,
-    basic.expectedLocation,
-    basic.educationLevel,
-  ])
-
-  const firstEducation = store.educationList.find((e) =>
-    [e.school, e.major, e.degree, e.startDate].some((value) => value?.trim())
-  )
-  const educationScore = firstEducation
-    ? scoreByFilled([firstEducation.school, firstEducation.major, firstEducation.degree, firstEducation.startDate])
-    : 0
-
-  const firstWork = store.workList.find((w) =>
-    [w.company, w.position, w.startDate, w.description].some((value) => value?.trim())
-  )
-  const workScore = firstWork
-    ? scoreByFilled([firstWork.company, firstWork.position, firstWork.startDate, firstWork.description])
-    : 0
-
-  const firstProject = store.projectList.find((p) =>
-    [p.name, p.role, p.startDate, p.mainWork].some((value) => value?.trim())
-  )
-  const projectScore = firstProject
-    ? scoreByFilled([firstProject.name, firstProject.role, firstProject.startDate, firstProject.mainWork])
-    : 0
-
-  const firstAward = store.awardList.find((a) => [a.name, a.date].some((value) => value?.trim()))
-  const awardsScore = firstAward ? scoreByFilled([firstAward.name, firstAward.date]) : 0
-
-  return {
-    basicInfo: basicInfoScore,
-    education: educationScore,
-    skills: hasTextContent(store.skills) ? 1 : 0,
-    workExperience: workScore,
-    projectExperience: projectScore,
-    awards: awardsScore,
-    selfIntro: hasTextContent(store.selfIntro) ? 1 : 0,
-  }
-})
-
-const completionPercent = computed(() => {
-  const enabledModules = store.modules.filter((m) => m.visible)
-  if (enabledModules.length === 0) return 0
-  const total = enabledModules.reduce((sum, mod) => sum + (moduleCompletion.value[mod.key] ?? 0), 0)
-  return Math.round((total / enabledModules.length) * 100)
-})
-
 function handleSave() {
   store.saveToStorage()
   if (store.isLoggedIn && store.currentResumeId) {
@@ -161,31 +100,6 @@ function handleSave() {
     showSaved.value = false
   }, 1800)
 }
-
-const isAutoSavePending = computed(() => store.nextAutoSaveAt !== null)
-const autoSaveChipText = computed(() => {
-  if (store.isSaving) {
-    return '自动保存中...'
-  }
-
-  const nextAt = store.nextAutoSaveAt
-  if (nextAt) {
-    const remainMs = Math.max(nextAt - nowTick.value, 0)
-    const remainSec = Math.max(remainMs / 1000, 0.1)
-    return `${remainSec.toFixed(1)}秒后自动保存`
-  }
-
-  const savedAt = store.lastSavedAt
-  if (!savedAt) {
-    return `自动保存间隔 ${Math.max(store.autoSaveDelayMs / 1000, 0.1).toFixed(1)}秒`
-  }
-
-  const elapsedMs = Math.max(nowTick.value - savedAt, 0)
-  const label = store.lastSaveMode === 'manual' ? '手动保存' : '自动保存'
-  if (elapsedMs < 2_000) return `刚刚${label}`
-  if (elapsedMs < 60_000) return `${Math.floor(elapsedMs / 1000)}秒前${label}`
-  return `${Math.floor(elapsedMs / 60_000)}分钟前${label}`
-})
 
 const isDefaultOrder = computed(() => store.isDefaultModuleOrder())
 
@@ -217,53 +131,11 @@ function moveDown(key: string) {
   store.moveModule(key, 'down')
 }
 
-function handleSwitchDragStart(event: DragEvent, key: string) {
-  if (key === 'basicInfo') {
-    event.preventDefault()
-    return
-  }
-  draggingModuleKey.value = key
-  event.dataTransfer?.setData('text/plain', key)
-  if (event.dataTransfer) {
-    event.dataTransfer.effectAllowed = 'move'
-  }
-}
-
-function handleSwitchDragOver(event: DragEvent, key: string) {
-  if (!draggingModuleKey.value || draggingModuleKey.value === key) return
-  event.preventDefault()
-  dragOverModuleKey.value = key
-  if (event.dataTransfer) {
-    event.dataTransfer.dropEffect = 'move'
-  }
-}
-
-function handleSwitchDrop(targetKey: string) {
-  const sourceKey = draggingModuleKey.value
-  if (!sourceKey || sourceKey === targetKey) return
-  store.reorderModule(sourceKey, targetKey)
-  dragOverModuleKey.value = null
-}
-
-function handleSwitchDragEnd() {
-  draggingModuleKey.value = null
-  dragOverModuleKey.value = null
-}
-
-let autoSaveTicker: ReturnType<typeof setInterval> | null = null
-
 onMounted(() => {
-  autoSaveTicker = setInterval(() => {
-    nowTick.value = Date.now()
-  }, 200)
   document.addEventListener('mousedown', handleDocumentPointerDown)
 })
 
 onUnmounted(() => {
-  if (autoSaveTicker) {
-    clearInterval(autoSaveTicker)
-    autoSaveTicker = null
-  }
   document.removeEventListener('mousedown', handleDocumentPointerDown)
 })
 </script>

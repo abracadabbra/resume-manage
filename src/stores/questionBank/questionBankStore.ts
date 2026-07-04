@@ -1,287 +1,47 @@
 import { defineStore } from 'pinia'
-import { ref, computed, watch } from 'vue'
-import {
-  buildQuestionSearchText,
-  extractTechStacksFromText,
-  normalizeStringList,
-} from '@/services/questionMetaService'
+import { ref, computed } from 'vue'
 import {
   getQuestionBankState,
   upsertQuestionBankState,
 } from '@/services/supabase'
-import { loadJson, saveJson } from '@/services/safeStorage'
-import type { ChatMessage } from '@/services/aiClient'
 import {
   createQuestionBankCloudManager,
   type QuestionBankCloudData,
-} from './questionBankCloud'
-import type { SyncConflict } from './syncConflict'
-
-export interface Question {
-  id: string
-  chapterId: string
-  number: number
-  title: string
-  difficulty: 'basic' | 'intermediate' | 'advanced'
-  labels: string[]
-  source?: QuestionSource
-  projectNames?: string[]
-  techStacks?: string[]
-  answer: {
-    content: string
-    followUp: { question: string; answer: string }[]
-  }
-}
-
-export type QuestionDraft = Omit<Question, 'id' | 'number'>
-export type QuestionSource = 'bundled' | 'manual' | 'resume-generated' | 'project-generated' | 'interview-review'
-export type QuestionViewFilter = 'all' | 'resume-generated' | 'review'
-export type PracticeMastery = 'unpracticed' | 'practicing' | 'mastered' | 'weak'
-export type QuestionSourceFilter = 'all' | QuestionSource
-export type PracticeMasteryFilter = 'all' | PracticeMastery
-
-export interface PracticeAiReview {
-  overallScore: number
-  completenessScore: number
-  accuracyScore: number
-  depthScore: number
-  deliveryScore: number
-  summary: string
-  strengths: string[]
-  improvements: string[]
-  improvedAnswer: string
-  updatedAt: number | null
-}
-
-export interface PracticeRecord {
-  answer: string
-  notes: string
-  mastery: PracticeMastery
-  updatedAt: number | null
-  aiReview: PracticeAiReview | null
-}
-
-export interface Chapter {
-  id: string
-  name: string
-  shortName: string
-  order: number
-  questionCount: number
-}
-
-interface QuestionBankDataset {
-  chapters: Chapter[]
-  questions: Question[]
-}
-
-const STORAGE_KEY = 'question-bank-added-questions'
-const PRACTICE_STORAGE_KEY = 'question-bank-practice-records'
-const AI_ANSWERS_STORAGE_KEY = 'question-bank-ai-answers'
-const QUESTION_BANK_LOCAL_SCHEMA_VERSION = 1
-const AI_GENERATED_SOURCES: QuestionSource[] = ['resume-generated', 'project-generated', 'interview-review']
-
-interface AddedQuestionsStorageData {
-  schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
-  questions: Question[]
-}
-
-interface PracticeRecordsStorageData {
-  schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
-  records: Record<string, PracticeRecord>
-}
-
-interface AiAnswersStorageData {
-  schemaVersion: typeof QUESTION_BANK_LOCAL_SCHEMA_VERSION
-  answers: Record<string, AiAnswerData>
-}
-
-export interface AiAnswerData {
-  answer: string
-  conversations: ChatMessage[]
-  updatedAt: number
-}
-
-function clampScore(value: unknown): number {
-  if (typeof value !== 'number' || Number.isNaN(value)) return 0
-  return Math.max(0, Math.min(100, Math.round(value)))
-}
-
-function inferQuestionSource(labels: string[] = [], fallback: QuestionSource = 'manual'): QuestionSource {
-  return labels.includes('简历定制') ? 'resume-generated' : fallback
-}
-
-function createEmptyPracticeRecord(): PracticeRecord {
-  return {
-    answer: '',
-    notes: '',
-    mastery: 'unpracticed',
-    updatedAt: null,
-    aiReview: null,
-  }
-}
-
-function normalizeAiReview(input: unknown): PracticeAiReview | null {
-  if (!input || typeof input !== 'object') return null
-  const record = input as Partial<PracticeAiReview>
-
-  return {
-    overallScore: clampScore(record.overallScore),
-    completenessScore: clampScore(record.completenessScore),
-    accuracyScore: clampScore(record.accuracyScore),
-    depthScore: clampScore(record.depthScore),
-    deliveryScore: clampScore(record.deliveryScore),
-    summary: String(record.summary ?? '').trim(),
-    strengths: Array.isArray(record.strengths)
-      ? record.strengths.map((item) => String(item).trim()).filter(Boolean)
-      : [],
-    improvements: Array.isArray(record.improvements)
-      ? record.improvements.map((item) => String(item).trim()).filter(Boolean)
-      : [],
-    improvedAnswer: String(record.improvedAnswer ?? '').trim(),
-    updatedAt:
-      typeof record.updatedAt === 'number' && Number.isFinite(record.updatedAt)
-        ? record.updatedAt
-        : null,
-  }
-}
-
-function normalizePracticeRecord(input: unknown): PracticeRecord {
-  if (!input || typeof input !== 'object') return createEmptyPracticeRecord()
-  const record = input as Partial<PracticeRecord>
-
-  return {
-    answer: String(record.answer ?? ''),
-    notes: String(record.notes ?? ''),
-    mastery:
-      record.mastery === 'practicing'
-      || record.mastery === 'mastered'
-      || record.mastery === 'weak'
-        ? record.mastery
-        : 'unpracticed',
-    updatedAt:
-      typeof record.updatedAt === 'number' && Number.isFinite(record.updatedAt)
-        ? record.updatedAt
-        : null,
-    aiReview: normalizeAiReview(record.aiReview),
-  }
-}
-
-function normalizePracticeRecords(input: unknown): Record<string, PracticeRecord> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
-
-  return Object.fromEntries(
-    Object.entries(input).map(([questionId, record]) => [
-      questionId,
-      normalizePracticeRecord(record),
-    ]),
-  )
-}
-
-function normalizeQuestion(input: Question, fallbackSource: QuestionSource): Question {
-  const normalizedLabels = normalizeStringList(input.labels)
-  const normalizedProjectNames = normalizeStringList(input.projectNames)
-  const normalizedTechStacks = normalizeStringList(input.techStacks)
-  const text = buildQuestionSearchText({
-    title: input.title,
-    answer: input.answer,
-    labels: normalizedLabels,
-    projectNames: normalizedProjectNames,
-    techStacks: normalizedTechStacks,
-  })
-
-  return {
-    ...input,
-    labels: normalizedLabels,
-    source: input.source ?? inferQuestionSource(normalizedLabels, fallbackSource),
-    projectNames: normalizedProjectNames,
-    techStacks: normalizedTechStacks.length > 0 ? normalizedTechStacks : extractTechStacksFromText(text),
-  }
-}
-
-function loadAddedQuestions(): Question[] {
-  const value = loadJson<AddedQuestionsStorageData | Question[]>(localStorage, STORAGE_KEY, []).value
-  const questions = Array.isArray(value) ? value : Array.isArray(value.questions) ? value.questions : []
-  return questions.map((item) => normalizeQuestion(item, 'manual'))
-}
-
-function saveAddedQuestions(questions: Question[]) {
-  saveJson(localStorage, STORAGE_KEY, {
-    schemaVersion: QUESTION_BANK_LOCAL_SCHEMA_VERSION,
-    questions,
-  } satisfies AddedQuestionsStorageData)
-}
-
-function loadPracticeRecords(): Record<string, PracticeRecord> {
-  const value = loadJson<PracticeRecordsStorageData | Record<string, PracticeRecord>>(
-    localStorage,
-    PRACTICE_STORAGE_KEY,
-    {},
-  ).value
-  const records =
-    value && typeof value === 'object' && !Array.isArray(value) && 'records' in value
-      ? value.records
-      : value
-  return normalizePracticeRecords(records)
-}
-
-function savePracticeRecords(records: Record<string, PracticeRecord>) {
-  saveJson(localStorage, PRACTICE_STORAGE_KEY, {
-    schemaVersion: QUESTION_BANK_LOCAL_SCHEMA_VERSION,
-    records,
-  } satisfies PracticeRecordsStorageData)
-}
-
-function loadAiAnswers(): Record<string, AiAnswerData> {
-  const value = loadJson<AiAnswersStorageData | Record<string, AiAnswerData>>(
-    localStorage,
-    AI_ANSWERS_STORAGE_KEY,
-    {},
-  ).value
-  const answers =
-    value && typeof value === 'object' && !Array.isArray(value) && 'answers' in value
-      ? value.answers
-      : value
-  return normalizeAiAnswers(answers)
-}
-
-function saveAiAnswers(answers: Record<string, AiAnswerData>) {
-  saveJson(localStorage, AI_ANSWERS_STORAGE_KEY, {
-    schemaVersion: QUESTION_BANK_LOCAL_SCHEMA_VERSION,
-    answers,
-  } satisfies AiAnswersStorageData)
-}
-
-function normalizeAiAnswers(input: unknown): Record<string, AiAnswerData> {
-  if (!input || typeof input !== 'object' || Array.isArray(input)) return {}
-  const record = input as Record<string, unknown>
-  return Object.fromEntries(
-    Object.entries(record).map(([questionId, data]) => [
-      questionId,
-      normalizeAiAnswerData(data),
-    ]),
-  )
-}
-
-function normalizeAiAnswerData(input: unknown): AiAnswerData {
-  if (!input || typeof input !== 'object') {
-    return { answer: '', conversations: [], updatedAt: 0 }
-  }
-  const data = input as Partial<AiAnswerData>
-  return {
-    answer: String(data.answer ?? ''),
-    conversations: Array.isArray(data.conversations) ? data.conversations : [],
-    updatedAt: typeof data.updatedAt === 'number' ? data.updatedAt : 0,
-  }
-}
-
-function cloneAiAnswers(answers: Record<string, AiAnswerData>): Record<string, AiAnswerData> {
-  return Object.fromEntries(
-    Object.entries(answers).map(([questionId, data]) => [
-      questionId,
-      { ...data, conversations: [...data.conversations] },
-    ]),
-  )
-}
+} from '../questionBankCloud'
+import type { SyncConflict } from '../syncConflict'
+import { useDebouncedAutoSave } from '../useDebouncedAutoSave'
+import { applyQuestionFilters, type QuestionFilterState } from './filters'
+import {
+  clampScore,
+  createEmptyPracticeRecord,
+  normalizeAiAnswers,
+  normalizeCloudAddedQuestions,
+  normalizePracticeRecords,
+  normalizeQuestion,
+} from './normalizers'
+import {
+  cloneAiAnswers,
+  clonePracticeRecords,
+  loadAddedQuestions,
+  loadAiAnswers,
+  loadPracticeRecords,
+  saveAddedQuestions,
+  saveAiAnswers,
+  savePracticeRecords,
+} from './persistence'
+import type {
+  AiAnswerData,
+  Chapter,
+  PracticeAiReview,
+  PracticeMastery,
+  PracticeMasteryFilter,
+  PracticeRecord,
+  Question,
+  QuestionBankDataset,
+  QuestionDraft,
+  QuestionSourceFilter,
+  QuestionViewFilter,
+} from './types'
 
 async function loadBundledQuestionBankData(): Promise<QuestionBankDataset> {
   const module = await import('@/data/interview-questions.json')
@@ -297,24 +57,6 @@ function formatLoadError(error: unknown): string {
 
 function createQuestionId(): string {
   return `added_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-}
-
-function clonePracticeRecords(records: Record<string, PracticeRecord>): Record<string, PracticeRecord> {
-  return Object.fromEntries(
-    Object.entries(records).map(([questionId, record]) => [
-      questionId,
-      {
-        ...record,
-        aiReview: record.aiReview
-          ? {
-              ...record.aiReview,
-              strengths: [...record.aiReview.strengths],
-              improvements: [...record.aiReview.improvements],
-            }
-          : null,
-      },
-    ]),
-  )
 }
 
 function getRecordTime(record: PracticeRecord): number {
@@ -363,13 +105,6 @@ function mergeAiAnswers(
   })
 
   return merged
-}
-
-function normalizeCloudAddedQuestions(input: unknown): Question[] {
-  if (!Array.isArray(input)) return []
-  return input
-    .filter((item): item is Question => Boolean(item && typeof item === 'object'))
-    .map((item) => normalizeQuestion(item, item.source ?? 'manual'))
 }
 
 export const useQuestionBankStore = defineStore('questionBank', () => {
@@ -446,42 +181,27 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
     loadData: loadCloudData,
   })
 
-  // Debounced auto-save
-  let saveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(
-    addedQuestions,
-    () => {
-      if (saveTimer) clearTimeout(saveTimer)
-      saveTimer = setTimeout(() => {
-        saveAddedQuestions(addedQuestions.value)
-      }, 500)
-    },
-    { deep: true },
-  )
+  // Debounced auto-save (unified via useDebouncedAutoSave)
+  useDebouncedAutoSave({
+    delayMs: 500,
+    getSnapshot: () => addedQuestions.value,
+    onScheduled: () => {},
+    onSave: () => saveAddedQuestions(addedQuestions.value),
+  })
 
-  let practiceSaveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(
-    practiceRecords,
-    () => {
-      if (practiceSaveTimer) clearTimeout(practiceSaveTimer)
-      practiceSaveTimer = setTimeout(() => {
-        savePracticeRecords(practiceRecords.value)
-      }, 500)
-    },
-    { deep: true },
-  )
+  useDebouncedAutoSave({
+    delayMs: 500,
+    getSnapshot: () => practiceRecords.value,
+    onScheduled: () => {},
+    onSave: () => savePracticeRecords(practiceRecords.value),
+  })
 
-  let aiAnswersSaveTimer: ReturnType<typeof setTimeout> | null = null
-  watch(
-    aiAnswers,
-    () => {
-      if (aiAnswersSaveTimer) clearTimeout(aiAnswersSaveTimer)
-      aiAnswersSaveTimer = setTimeout(() => {
-        saveAiAnswers(aiAnswers.value)
-      }, 500)
-    },
-    { deep: true },
-  )
+  useDebouncedAutoSave({
+    delayMs: 500,
+    getSnapshot: () => aiAnswers.value,
+    onScheduled: () => {},
+    onSave: () => saveAiAnswers(aiAnswers.value),
+  })
 
   function isQuestionReviewCandidate(questionId: string): boolean {
     const record = practiceRecords.value[questionId]
@@ -491,54 +211,21 @@ export const useQuestionBankStore = defineStore('questionBank', () => {
   }
 
   const filteredQuestions = computed(() => {
-    let result = questions.value
-
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase()
-      result = result.filter(
-        (item) => buildQuestionSearchText(item).toLowerCase().includes(q),
-      )
+    const filters: QuestionFilterState = {
+      searchQuery: searchQuery.value,
+      activeChapterId: activeChapterId.value,
+      difficulty: difficultyFilter.value,
+      view: viewFilter.value,
+      source: sourceFilter.value,
+      mastery: masteryFilter.value,
+      label: labelFilter.value,
+      projectName: projectNameFilter.value,
+      techStack: techStackFilter.value,
     }
-
-    if (activeChapterId.value) {
-      result = result.filter((item) => item.chapterId === activeChapterId.value)
-    }
-
-    if (difficultyFilter.value) {
-      result = result.filter((item) => item.difficulty === difficultyFilter.value)
-    }
-
-    if (sourceFilter.value !== 'all') {
-      result = result.filter((item) => item.source === sourceFilter.value)
-    }
-
-    if (masteryFilter.value !== 'all') {
-      result = result.filter((item) => getPracticeRecord(item.id).mastery === masteryFilter.value)
-    }
-
-    if (labelFilter.value) {
-      result = result.filter((item) => item.labels.includes(labelFilter.value!))
-    }
-
-    if (projectNameFilter.value) {
-      result = result.filter((item) => item.projectNames?.includes(projectNameFilter.value!) ?? false)
-    }
-
-    if (techStackFilter.value) {
-      result = result.filter((item) => item.techStacks?.includes(techStackFilter.value!) ?? false)
-    }
-
-    if (viewFilter.value === 'resume-generated') {
-      result = result.filter(
-        (item) => AI_GENERATED_SOURCES.includes(item.source ?? inferQuestionSource(item.labels, 'manual')) || item.labels.includes('简历定制'),
-      )
-    }
-
-    if (viewFilter.value === 'review') {
-      result = result.filter((item) => isQuestionReviewCandidate(item.id))
-    }
-
-    return result
+    return applyQuestionFilters(questions.value, filters, {
+      getPracticeRecord,
+      isReviewCandidate: isQuestionReviewCandidate,
+    })
   })
 
   const selectedQuestion = computed(() =>

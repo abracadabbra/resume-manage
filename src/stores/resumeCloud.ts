@@ -1,9 +1,38 @@
-import type { ResumeRecord } from '@/services/supabase'
+import {
+  signUp,
+  signIn,
+  signOut,
+  getResumes,
+  getActiveResume,
+  createResume,
+  updateResume,
+  setActiveResume,
+  deleteResume,
+  type ResumeRecord,
+} from '@/services/supabase'
 import {
   createSyncConflict,
   decideSyncDecision,
   type SyncConflict,
 } from './syncConflict'
+
+export type { ResumeRecord }
+
+/**
+ * 统一收敛的 supabase resume API 对象。
+ * resume store 直接传入 createResumeCloudManager 的 api 参数。
+ */
+export const resumeCloudApi = {
+  signUp,
+  signIn,
+  signOut,
+  getResumes,
+  getActiveResume,
+  createResume,
+  updateResume,
+  setActiveResume,
+  deleteResume,
+}
 
 type ValueRef<T> = { value: T }
 

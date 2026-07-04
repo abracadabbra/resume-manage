@@ -7,22 +7,10 @@ import {
   loadResumeDataFromStorage,
   saveResumeDataToStorage,
 } from './resumePersistence'
-import { createResumeCloudManager } from './resumeCloud'
+import { createResumeCloudManager, resumeCloudApi, type ResumeRecord } from './resumeCloud'
 import type { SyncConflict } from './syncConflict'
 import { useDebouncedAutoSave } from './useDebouncedAutoSave'
 import { loadJson, saveJson } from '@/services/safeStorage'
-import { 
-  signUp, 
-  signIn, 
-  signOut, 
-  getResumes, 
-  getActiveResume, 
-  createResume, 
-  updateResume, 
-  setActiveResume, 
-  deleteResume,
-  type ResumeRecord 
-} from '@/services/supabase'
 
 export interface BasicInfo {
   name: string
@@ -405,17 +393,7 @@ export const useResumeStore = defineStore('resume', () => {
   }
 
   const cloudManager = createResumeCloudManager({
-    api: {
-      signUp,
-      signIn,
-      signOut,
-      getResumes,
-      getActiveResume,
-      createResume,
-      updateResume,
-      setActiveResume,
-      deleteResume,
-    },
+    api: resumeCloudApi,
     state: {
       isLoggedIn,
       userId,

@@ -3,6 +3,7 @@ import type { BasicInfo, EducationEntry, ProjectEntry, WorkEntry } from '@/store
 import { streamChatCompletion } from '@/services/aiClient'
 import { candidateModeSystemPrompt } from '@/services/prompts/interviewCandidatePrompt'
 import { interviewerModeSystemPrompt } from '@/services/prompts/interviewInterviewerPrompt'
+import { stripHtml } from '@/services/htmlUtils'
 
 export type InterviewMode = 'candidate' | 'interviewer'
 
@@ -72,19 +73,6 @@ export interface InterviewTurnStreamCallbacks {
   onAssistantReplyChunk?: (text: string) => void
 }
 
-function toPlainText(htmlOrText: string): string {
-  return htmlOrText
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/?(p|div|li|ul|ol|h[1-6])[^>]*>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&amp;/gi, '&')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
-}
-
 function compactList(lines: string[]): string[] {
   return lines.map((line) => line.trim()).filter(Boolean)
 }
@@ -111,7 +99,7 @@ export function buildResumeDigest(snapshot: ResumeSnapshot, mode: 'full' | 'comp
   if (basicInfo.currentStatus) basic.push(`求职状态: ${basicInfo.currentStatus}`)
 
   const skills = compactList(
-    toPlainText(snapshot.skillsText)
+    stripHtml(snapshot.skillsText)
       .split(/\n|,|，|;|；/)
       .slice(0, isCompact ? 12 : 24)
   )
@@ -127,8 +115,8 @@ export function buildResumeDigest(snapshot: ResumeSnapshot, mode: 'full' | 'comp
       if (project.startDate || project.endDate) {
         lines.push(`时间: ${project.startDate || ''} ~ ${project.endDate || ''}`)
       }
-      if (project.introduction) lines.push(`项目目的: ${truncateText(toPlainText(project.introduction), isCompact ? 120 : 260)}`)
-      if (project.mainWork) lines.push(`主要工作: ${truncateText(toPlainText(project.mainWork), isCompact ? 120 : 260)}`)
+      if (project.introduction) lines.push(`项目目的: ${truncateText(stripHtml(project.introduction), isCompact ? 120 : 260)}`)
+      if (project.mainWork) lines.push(`主要工作: ${truncateText(stripHtml(project.mainWork), isCompact ? 120 : 260)}`)
       return lines.join('\n')
     })
     .join('\n---\n')
@@ -140,7 +128,7 @@ export function buildResumeDigest(snapshot: ResumeSnapshot, mode: 'full' | 'comp
       if (work.startDate || work.endDate) {
         lines.push(`时间: ${work.startDate || ''} ~ ${work.endDate || ''}`)
       }
-      if (work.description) lines.push(`工作描述: ${truncateText(toPlainText(work.description), isCompact ? 120 : 240)}`)
+      if (work.description) lines.push(`工作描述: ${truncateText(stripHtml(work.description), isCompact ? 120 : 240)}`)
       return lines.join('\n')
     })
     .join('\n---\n')
@@ -169,7 +157,7 @@ export function buildResumeDigest(snapshot: ResumeSnapshot, mode: 'full' | 'comp
     '',
     '【教育经历】',
     education || '未填写',
-    snapshot.selfIntro ? `\n【自我介绍】\n${truncateText(toPlainText(snapshot.selfIntro), isCompact ? 120 : 240)}` : '',
+    snapshot.selfIntro ? `\n【自我介绍】\n${truncateText(stripHtml(snapshot.selfIntro), isCompact ? 120 : 240)}` : '',
   ]
     .join('\n')
     .trim()

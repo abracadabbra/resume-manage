@@ -1,4 +1,5 @@
 import type { useResumeStore } from '@/stores/resume'
+import { stripHtml } from './htmlUtils'
 
 type ResumeStore = ReturnType<typeof useResumeStore>
 
@@ -53,22 +54,10 @@ export function htmlToMarkdown(html: string): string {
   // Divs → newline
   md = md.replace(/<div[^>]*>([\s\S]*?)<\/div>/gi, '$1\n')
 
-  // Strip any remaining tags
-  md = md.replace(/<[^>]+>/g, '')
+  // Strip any remaining tags, decode entities, collapse blank lines
+  md = stripHtml(md)
 
-  // Decode common HTML entities
-  md = md
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&amp;/gi, '&')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&quot;/gi, '"')
-    .replace(/&#39;/gi, "'")
-
-  // Collapse multiple blank lines to at most two
-  md = md.replace(/\n{3,}/g, '\n\n')
-
-  return md.trim()
+  return md
 }
 
 /**

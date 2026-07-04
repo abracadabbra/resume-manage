@@ -1,3 +1,5 @@
+import { stripHtml } from './htmlUtils'
+
 const ALLOWED_TAGS = new Set([
   'A',
   'B',
@@ -129,7 +131,7 @@ function sanitizeNode(node: Node): Node {
 }
 
 function stripHtmlFallback(raw: string): string {
-  return raw.replace(/<[^>]*>/g, '')
+  return stripHtml(raw)
 }
 
 export function sanitizeHtml(raw: string): string {

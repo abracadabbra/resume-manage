@@ -7,6 +7,7 @@ import type {
 } from '@/stores/resume'
 import { streamChatCompletion } from './aiClient'
 import { getModuleOutputRules, SYSTEM_PROMPT } from './prompts'
+import { stripHtml } from './htmlUtils'
 
 function formatBasicInfo(info: BasicInfo): string {
   const lines: string[] = []
@@ -26,19 +27,6 @@ function formatBasicInfo(info: BasicInfo): string {
   if (info.github) lines.push(`GitHub：${info.github}`)
   if (info.blog) lines.push(`博客：${info.blog}`)
   return lines.join('\n')
-}
-
-function stripHtml(html: string): string {
-  return html
-    .replace(/<br\s*\/?>/gi, '\n')
-    .replace(/<\/?(p|div|li|ul|ol|h[1-6])[^>]*>/gi, '\n')
-    .replace(/<[^>]*>/g, '')
-    .replace(/&nbsp;/gi, ' ')
-    .replace(/&lt;/gi, '<')
-    .replace(/&gt;/gi, '>')
-    .replace(/&amp;/gi, '&')
-    .replace(/\n{3,}/g, '\n\n')
-    .trim()
 }
 
 function formatEducation(list: EducationEntry[]): string {
