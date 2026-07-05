@@ -1,0 +1,5 @@
+{
+  "apiUrl": "https://your-api-endpoint.com",
+  "apiToken": "your-api-token-here",
+  "modelName": "your-model-name"
+}

@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { ref } from 'vue'
 import type { InterviewReviewQuestionBatch } from '@/services/interviewReviewQuestionService'
 
 defineProps<{
@@ -14,6 +15,18 @@ const emit = defineEmits<{
   (e: 'cancel'): void
   (e: 'import'): void
 }>()
+
+// 记录每道题的答案展开状态
+const expandedAnswers = ref<Record<string, boolean>>({})
+
+function toggleAnswer(index: number) {
+  const key = `q-${index}`
+  expandedAnswers.value[key] = !expandedAnswers.value[key]
+}
+
+function isAnswerExpanded(index: number): boolean {
+  return expandedAnswers.value[`q-${index}`] ?? false
+}
 </script>
 
 <template>
@@ -74,6 +87,54 @@ const emit = defineEmits<{
             </span>
           </div>
           <p class="review-question-item-title">{{ item.title }}</p>
+
+          <!-- 答案展示区（可折叠） -->
+          <div v-if="item.answer && item.answer.content?.trim()" class="review-question-answer">
+            <button
+              type="button"
+              class="review-question-answer-toggle"
+              @click="toggleAnswer(index)"
+            >
+              <span class="review-question-answer-toggle-icon">
+                {{ isAnswerExpanded(index) ? '▼' : '▶' }}
+              </span>
+              <span>参考答案</span>
+            </button>
+
+            <div v-if="isAnswerExpanded(index)" class="review-question-answer-content">
+              <div class="review-question-answer-main">
+                <div class="review-question-answer-label">参考答案</div>
+                <p class="review-question-answer-text">{{ item.answer.content }}</p>
+              </div>
+
+              <div
+                v-if="item.answer.followUp && item.answer.followUp.length > 0"
+                class="review-question-followup"
+              >
+                <div class="review-question-followup-label">高频追问</div>
+                <div
+                  v-for="(followUp, fIndex) in item.answer.followUp"
+                  :key="fIndex"
+                  class="review-question-followup-item"
+                >
+                  <div class="review-question-followup-q">
+                    <span class="review-question-followup-q-icon">Q</span>
+                    <span>{{ followUp.question }}</span>
+                  </div>
+                  <div class="review-question-followup-a">
+                    <span class="review-question-followup-a-icon">A</span>
+                    <span>{{ followUp.answer }}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div v-else class="review-question-answer-empty">
+            <div class="review-question-answer-empty-text">
+              <span>暂无参考答案</span>
+              <span class="review-question-answer-empty-hint">AI 复盘未能生成该题答案，可自行补充或搜索相关知识点</span>
+            </div>
+          </div>
         </article>
       </div>
 
@@ -257,6 +318,170 @@ const emit = defineEmits<{
   line-height: 1.5;
   color: #2d2521;
   font-weight: 600;
+}
+
+/* 答案展示区 */
+.review-question-answer {
+  margin-top: 10px;
+  border-top: 1px dashed #eadfd2;
+  padding-top: 10px;
+}
+
+.review-question-answer-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  padding: 4px 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: #7b6a5b;
+  cursor: pointer;
+  transition: color 0.2s, gap 0.2s;
+}
+
+.review-question-answer-toggle:hover {
+  color: #5f5448;
+  gap: 8px;
+}
+
+.review-question-answer-toggle-icon {
+  font-size: 10px;
+  width: 12px;
+  text-align: center;
+  transition: transform 0.2s;
+}
+
+.review-question-answer-content {
+  margin-top: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  animation: slideDown 0.25s ease-out;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.review-question-answer-main {
+  background: linear-gradient(135deg, #fdfcfb 0%, #f9f6f2 100%);
+  border-radius: 8px;
+  padding: 12px;
+  border-left: 3px solid #c9a87c;
+}
+
+.review-question-answer-label,
+.review-question-followup-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #8a7258;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  margin-bottom: 6px;
+}
+
+.review-question-answer-text {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #40362d;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.review-question-followup {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.review-question-followup-item {
+  background: #fdfcfb;
+  border: 1px solid #eadfd2;
+  border-radius: 8px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.review-question-followup-q,
+.review-question-followup-a {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.review-question-followup-q-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #f3ece5;
+  color: #7b6a5b;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.review-question-followup-a-icon {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #e8f5e9;
+  color: #2b7a45;
+  font-size: 10px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.review-question-followup-q span:last-child,
+.review-question-followup-a span:last-child {
+  color: #40362d;
+}
+
+.review-question-answer-empty {
+  margin-top: 10px;
+  border-top: 1px dashed #eadfd2;
+  padding-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: #a09080;
+  font-style: normal;
+}
+
+.review-question-answer-empty::before {
+  content: '💡';
+  font-size: 14px;
+}
+
+.review-question-answer-empty-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.review-question-answer-empty-hint {
+  font-size: 11px;
+  color: #c0b0a0;
 }
 
 .review-question-actions {

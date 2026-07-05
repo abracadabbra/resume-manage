@@ -1,0 +1,28 @@
+{
+  "id": "tech-practice-sync-v3",
+  "name": "tech-practice-sync-v3",
+  "title": "大厂面经 v3 云同步（共享AI+私有追问笔记）",
+  "description": "",
+  "status": "in_progress",
+  "dev_type": null,
+  "scope": null,
+  "package": null,
+  "priority": "P2",
+  "creator": "shentao",
+  "assignee": "shentao",
+  "createdAt": "2026-06-30",
+  "completedAt": null,
+  "branch": null,
+  "base_branch": "main",
+  "worktree_path": null,
+  "commit": null,
+  "pr_url": null,
+  "subtasks": [],
+  "children": [
+    "07-04-refactor-cloud-sync-common"
+  ],
+  "parent": null,
+  "relatedFiles": [],
+  "notes": "",
+  "meta": {}
+}

@@ -43,3 +43,24 @@ __screenshots__/
 
 # Vite
 *.timestamp-*-*.mjs
+
+# Supabase migration generated artifacts (regenerable from sources by scripts/build-v3-bundle.cjs)
+supabase/migrations/v3_*.sql
+supabase/migrations/_comments_post.sql
+
+# Tool / Agent runtime state (regenerable)
+.claude/settings.json
+.claude/scheduled_tasks.lock
+.omc/sessions/
+.omc/state/checkpoints/
+.omc/state/sessions/
+.qoder/
+.workbuddy/
+cursor-local-assistant-v2/
+scripts/__pycache__/
+scripts/xhs_cookies.json
+scripts/output/
+
+# Local config (has .example files)
+ai-config.json
+.docker-env.txt

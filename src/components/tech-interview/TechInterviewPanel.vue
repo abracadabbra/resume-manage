@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref } from 'vue'
+import { onMounted, onUnmounted, provide, ref } from 'vue'
 import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
 import { useAuthStore } from '@/stores/auth'
 import TechCategoryNav from './TechCategoryNav.vue'
@@ -13,6 +13,21 @@ const store = useTechInterviewQuestionsStore()
 const auth = useAuthStore()
 const conflictDrawerOpen = ref(false)
 const authDialogOpen = ref(false)
+
+const toastMessage = ref('')
+const toastVisible = ref(false)
+let toastTimer: ReturnType<typeof setTimeout> | null = null
+
+function showToast(message: string) {
+  toastMessage.value = message
+  toastVisible.value = true
+  if (toastTimer) clearTimeout(toastTimer)
+  toastTimer = setTimeout(() => {
+    toastVisible.value = false
+  }, 2000)
+}
+
+provide('techInterviewToast', showToast)
 
 onMounted(async () => {
   // 1) 初始化 auth（拉当前 session + 监听变化）
@@ -84,6 +99,9 @@ function handleKeydown(e: KeyboardEvent) {
         v-if="authDialogOpen"
         @close="authDialogOpen = false"
       />
+      <Transition name="toast">
+        <div v-if="toastVisible" class="toast">{{ toastMessage }}</div>
+      </Transition>
     </template>
   </div>
 </template>
@@ -148,5 +166,32 @@ function handleKeydown(e: KeyboardEvent) {
 .retry-btn:hover {
   border-color: #d97745;
   color: #d97745;
+}
+
+.toast {
+  position: fixed;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 10px 18px;
+  border-radius: 8px;
+  background: #2d2521;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 500;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  z-index: 1000;
+  pointer-events: none;
+}
+
+.toast-enter-active,
+.toast-leave-active {
+  transition: all 0.2s ease;
+}
+
+.toast-enter-from,
+.toast-leave-to {
+  opacity: 0;
+  transform: translateX(-50%) translateY(12px);
 }
 </style>

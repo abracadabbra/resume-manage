@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref } from 'vue'
 import { buildQuestionReviewInsights } from '@/services/questionInsightService'
 import { useQuestionBankStore } from '@/stores/questionBank'
 import { useTechInterviewQuestionsStore } from '@/stores/techInterviewQuestions'
@@ -15,6 +15,7 @@ interface MarkedItem {
   id: string
   text: string
   source: '题库' | '大厂面经'
+  sourceKey: 'bank' | 'tech'
   mastery: string
   techField?: string
 }
@@ -47,6 +48,40 @@ const insights = computed(() => {
   }
 })
 
+const expandedId = ref<string | null>(null)
+
+function toggleExpand(id: string) {
+  expandedId.value = expandedId.value === id ? null : id
+  // 大厂面经：展开时按需懒加载 AI 答案（已是已有逻辑）
+  if (expandedId.value) {
+    const item = markedQuestions.value.find((q) => q.id === id)
+    if (item?.sourceKey === 'tech') void techInterviewStore.loadAiAnswerIfNeeded(id)
+  }
+}
+
+function isExpanded(id: string): boolean {
+  return expandedId.value === id
+}
+
+/** 取答案文本：题库直接读 pinia；大厂面经优先读 aiAnswers.value[id]?.answer，否则显示「加载中」 */
+function getAnswer(item: MarkedItem): string {
+  if (item.sourceKey === 'tech') {
+    return techInterviewStore.aiAnswers[item.id]?.answer ?? '正在加载…'
+  }
+  return store.aiAnswers[item.id]?.answer ?? '暂无答案'
+}
+
+function renderMarkdown(text: string): string {
+  // 简单占位：复用项目里 markdown-it 的轻量替代（不引入新依赖）
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
+    .replace(/`([^`]+)`/g, '<code>$1</code>')
+    .replace(/\n/g, '<br>')
+}
+
 const markedQuestions = computed<MarkedItem[]>(() => {
   const items: MarkedItem[] = []
 
@@ -57,6 +92,7 @@ const markedQuestions = computed<MarkedItem[]>(() => {
         id: q.id,
         text: q.title,
         source: '题库',
+        sourceKey: 'bank',
         mastery: record.mastery,
       })
     }
@@ -69,6 +105,7 @@ const markedQuestions = computed<MarkedItem[]>(() => {
         id: q.id,
         text: q.q,
         source: '大厂面经',
+        sourceKey: 'tech',
         mastery: record.mastery,
         techField: q.techField,
       })
@@ -263,23 +300,34 @@ function markReviewQueuePracticed() {
       <section v-if="markedQuestions.length" class="queue-section">
         <div class="queue-head">
           <h4 class="section-title">我的标记</h4>
-          <span class="queue-tip">所有标记了熟练度的问题</span>
+          <span class="queue-tip">点击展开答案 · 薄弱在前，熟练在后</span>
         </div>
         <div class="queue-list">
-          <button
+          <div
             v-for="item in markedQuestions"
             :key="item.id"
-            type="button"
-            class="queue-item"
+            class="queue-item-wrap"
           >
-            <div class="queue-item-main">
-              <span class="queue-title">{{ item.text }}</span>
-              <span class="queue-meta">{{ item.source }} · {{ { weak: '薄弱', practicing: '练习中', mastered: '熟练' }[item.mastery] }}</span>
+            <button
+              type="button"
+              class="queue-item"
+              :aria-expanded="isExpanded(item.id)"
+              @click="toggleExpand(item.id)"
+            >
+              <div class="queue-item-main">
+                <span class="queue-title">{{ item.text }}</span>
+                <span class="queue-meta">{{ item.source }} · {{ { weak: '薄弱', practicing: '练习中', mastered: '熟练' }[item.mastery] }}</span>
+              </div>
+              <div v-if="item.techField" class="queue-tags">
+                <span class="queue-tag">{{ item.techField }}</span>
+              </div>
+              <span class="queue-chevron" :class="{ open: isExpanded(item.id) }">▸</span>
+            </button>
+            <div v-if="isExpanded(item.id)" class="queue-answer">
+              <div class="queue-answer-label">参考答案</div>
+              <div class="queue-answer-body" v-html="renderMarkdown(getAnswer(item))" />
             </div>
-            <div v-if="item.techField" class="queue-tags">
-              <span class="queue-tag">{{ item.techField }}</span>
-            </div>
-          </button>
+          </div>
         </div>
       </section>
     </template>
@@ -479,14 +527,65 @@ function markReviewQueuePracticed() {
   margin-top: 10px;
 }
 
-.queue-item {
-  width: 100%;
-  padding: 10px 12px;
+.queue-item-wrap {
+  display: flex;
+  flex-direction: column;
   border: 1px solid #eadfce;
   border-radius: 8px;
   background: #fffaf6;
+  overflow: hidden;
+}
+
+.queue-item {
+  width: 100%;
+  padding: 10px 12px;
+  border: none;
+  background: transparent;
   text-align: left;
   cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.queue-chevron {
+  color: #a48b71;
+  font-size: 14px;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
+}
+
+.queue-chevron.open {
+  transform: rotate(90deg);
+}
+
+.queue-answer {
+  padding: 10px 14px 14px;
+  border-top: 1px dashed #eadfce;
+  background: #fbf5ee;
+}
+
+.queue-answer-label {
+  font-size: 11px;
+  color: #a48b71;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+  text-transform: uppercase;
+}
+
+.queue-answer-body {
+  font-size: 13px;
+  line-height: 1.7;
+  color: #4a4035;
+}
+
+.queue-answer-body :deep(strong) { color: #d97745; font-weight: 600; }
+.queue-answer-body :deep(code) {
+  background: #f0e7d9;
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: ui-monospace, SFMono-Regular, monospace;
+  font-size: 12px;
 }
 
 .queue-item-main {

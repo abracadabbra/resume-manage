@@ -109,22 +109,42 @@ export class TechInterviewApiError extends Error {
 
 // ---------- 公共表只读 ----------
 
-/** 拉题库元数据（pull 阶段使用） */
+/** 拉题库元数据（pull 阶段使用）。分页避免 1000 行上限 */
 export async function fetchQuestionsMeta(): Promise<QuestionMeta[]> {
-  const { data, error } = await getClient()
-    .from('tech_interview_questions')
-    .select('id, mention_count, tech_field, position, updated_at')
-  if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_interview_questions')
-  return (data ?? []) as QuestionMeta[]
+  const PAGE = 1000
+  const out: QuestionMeta[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await getClient()
+      .from('tech_interview_questions')
+      .select('id, mention_count, tech_field, position, updated_at')
+      .range(from, from + PAGE - 1)
+    if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_interview_questions')
+    const batch = (data ?? []) as QuestionMeta[]
+    out.push(...batch)
+    if (batch.length < PAGE) break
+    from += PAGE
+  }
+  return out
 }
 
-/** 拉全量题目行（主数据源初始化时使用） */
+/** 拉全量题目行（主数据源初始化时使用）。分页拉取以避开 PostgREST 默认 1000 行上限 */
 export async function fetchQuestionsAll(): Promise<QuestionRow[]> {
-  const { data, error } = await getClient()
-    .from('tech_interview_questions')
-    .select('*')
-  if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_interview_questions')
-  return (data ?? []) as QuestionRow[]
+  const PAGE = 1000
+  const out: QuestionRow[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await getClient()
+      .from('tech_interview_questions')
+      .select('*')
+      .range(from, from + PAGE - 1)
+    if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_interview_questions')
+    const batch = (data ?? []) as QuestionRow[]
+    out.push(...batch)
+    if (batch.length < PAGE) break
+    from += PAGE
+  }
+  return out
 }
 
 /** 拉题目详情（按需懒加载） */
@@ -138,13 +158,23 @@ export async function fetchQuestionDetail(qid: string): Promise<QuestionRow | nu
   return (data as QuestionRow) ?? null
 }
 
-/** 拉 AI 答案元数据（pull 阶段使用） */
+/** 拉 AI 答案元数据（pull 阶段使用）。分页避免 1000 行上限 */
 export async function fetchAiAnswersMeta(): Promise<AiAnswerMeta[]> {
-  const { data, error } = await getClient()
-    .from('tech_interview_ai_answers')
-    .select('question_id, updated_at')
-  if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_interview_ai_answers')
-  return (data ?? []) as AiAnswerMeta[]
+  const PAGE = 1000
+  const out: AiAnswerMeta[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await getClient()
+      .from('tech_interview_ai_answers')
+      .select('question_id, updated_at')
+      .range(from, from + PAGE - 1)
+    if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_interview_ai_answers')
+    const batch = (data ?? []) as AiAnswerMeta[]
+    out.push(...batch)
+    if (batch.length < PAGE) break
+    from += PAGE
+  }
+  return out
 }
 
 /** 拉单个题目的 AI 答案（公共答案文本） */
@@ -160,21 +190,33 @@ export async function fetchAiAnswerByQid(qid: string): Promise<string | null> {
 
 // ---------- 私有 - practice ----------
 
-/** 拉当前用户所有 practice 记录元数据 */
-export async function fetchPracticeMeta(): Promise<PracticeRecordMeta[]> {
-  const { data, error } = await getClient()
-    .from('tech_practice_records')
-    .select('question_id, mastery, updated_at')
-  if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_practice_records')
-  return (data ?? []) as PracticeRecordMeta[]
+/** 拉当前用户所有 practice 记录元数据。分页避免 1000 行上限 */
+export async function fetchPracticeMeta(userId: string): Promise<PracticeRecordMeta[]> {
+  const PAGE = 1000
+  const out: PracticeRecordMeta[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await getClient()
+      .from('tech_practice_records')
+      .select('question_id, mastery, updated_at')
+      .eq('user_id', userId)
+      .range(from, from + PAGE - 1)
+    if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_practice_records')
+    const batch = (data ?? []) as PracticeRecordMeta[]
+    out.push(...batch)
+    if (batch.length < PAGE) break
+    from += PAGE
+  }
+  return out
 }
 
 /** 拉单个 practice 详情（懒加载 answer / notes） */
-export async function fetchPracticeDetail(qid: string): Promise<PracticeRecordRow | null> {
+export async function fetchPracticeDetail(qid: string, userId: string): Promise<PracticeRecordRow | null> {
   const { data, error } = await getClient()
     .from('tech_practice_records')
     .select('*')
     .eq('question_id', qid)
+    .eq('user_id', userId)
     .maybeSingle()
   if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_practice_records')
   return (data as PracticeRecordRow) ?? null
@@ -211,21 +253,33 @@ export async function upsertPracticeBatch(rows: PracticeRecordRow[]): Promise<st
 
 // ---------- 私有 - conversations ----------
 
-/** 拉当前用户所有 conversations 元数据 */
-export async function fetchConversationsMeta(): Promise<ConversationMeta[]> {
-  const { data, error } = await getClient()
-    .from('tech_user_ai_conversations')
-    .select('question_id, updated_at')
-  if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_user_ai_conversations')
-  return (data ?? []) as ConversationMeta[]
+/** 拉当前用户所有 conversations 元数据。分页避免 1000 行上限 */
+export async function fetchConversationsMeta(userId: string): Promise<ConversationMeta[]> {
+  const PAGE = 1000
+  const out: ConversationMeta[] = []
+  let from = 0
+  while (true) {
+    const { data, error } = await getClient()
+      .from('tech_user_ai_conversations')
+      .select('question_id, updated_at')
+      .eq('user_id', userId)
+      .range(from, from + PAGE - 1)
+    if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_user_ai_conversations')
+    const batch = (data ?? []) as ConversationMeta[]
+    out.push(...batch)
+    if (batch.length < PAGE) break
+    from += PAGE
+  }
+  return out
 }
 
 /** 拉单个 conversations 详情（懒加载 conversations JSONB） */
-export async function fetchConversationsDetail(qid: string): Promise<ConversationRow | null> {
+export async function fetchConversationsDetail(qid: string, userId: string): Promise<ConversationRow | null> {
   const { data, error } = await getClient()
     .from('tech_user_ai_conversations')
     .select('*')
     .eq('question_id', qid)
+    .eq('user_id', userId)
     .maybeSingle()
   if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_user_ai_conversations')
   return (data as ConversationRow) ?? null
@@ -254,10 +308,11 @@ export async function upsertConversationsBatch(rows: ConversationRow[]): Promise
 }
 
 /** 删除 conversations（用户清空自己的追问） */
-export async function deleteConversations(qid: string): Promise<void> {
+export async function deleteConversations(qid: string, userId: string): Promise<void> {
   const { error } = await getClient()
     .from('tech_user_ai_conversations')
     .delete()
     .eq('question_id', qid)
+    .eq('user_id', userId)
   if (error) throw new TechInterviewApiError(error.message, error.code, 'tech_user_ai_conversations')
 }

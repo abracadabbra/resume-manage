@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref, watch } from 'vue'
+import { computed, inject, ref, watch } from 'vue'
 import { useTechInterviewQuestionsStore, type TechInterviewQuestion } from '@/stores/techInterviewQuestions'
 import { useAiConfigStore } from '@/stores/aiConfig'
 import { generateTechInterviewAnswer } from '@/services/techInterviewAnswerGenerationService'
@@ -8,6 +8,7 @@ import TechInterviewAiAnswer from './TechInterviewAiAnswer.vue'
 
 const store = useTechInterviewQuestionsStore()
 const aiConfig = useAiConfigStore()
+const showToast = inject<(message: string) => void>('techInterviewToast', () => {})
 
 const MASTERY_LABELS: Record<string, string> = {
   unpracticed: '未练',
@@ -31,6 +32,16 @@ function getMasteryLabel(mastery: string): string {
 
 function getMasteryClass(mastery: string): string {
   return MASTERY_CLASSES[mastery] ?? 'mst-unpracticed'
+}
+
+function handleSetMastery(mastery: 'unpracticed' | 'practicing' | 'mastered' | 'weak') {
+  if (!store.selectedQuestionId) return
+  store.setPracticeMastery(store.selectedQuestionId, mastery)
+  if (mastery === 'weak') {
+    showToast('已加入薄弱题库')
+  } else if (mastery === 'mastered') {
+    showToast('已标记为熟练')
+  }
 }
 
 function currentMastery(): string {
@@ -102,7 +113,10 @@ function cancelAiAnswerGeneration() {
   resetAiAnswerState()
 }
 
-async function handleGenerateAiAnswer() {
+async function executeAiAnswerGeneration(
+  conversation: ChatMessage[],
+  onAnswerGenerated: (answer: string) => void,
+) {
   if (!store.selectedQuestion || !store.selectedQuestionId) return
 
   isGeneratingAiAnswer.value = true
@@ -113,20 +127,14 @@ async function handleGenerateAiAnswer() {
   await generateTechInterviewAnswer(
     {
       question: toQuestionInput(store.selectedQuestion),
-      conversation: currentAiConversations.value,
+      conversation,
     },
     {
       onChunk(text) {
         aiAnswerStreamingText.value = text
       },
       onDone(answer) {
-        const qid = store.selectedQuestionId!
-        // 保存公共答案文本到 aiAnswers
-        store.saveAiAnswerData(qid, {
-          answer,
-          conversations: store.aiConversations[qid]?.conversations ?? [],
-          updatedAt: Date.now(),
-        })
+        onAnswerGenerated(answer)
         isGeneratingAiAnswer.value = false
         aiAnswerAbortController = null
       },
@@ -140,50 +148,41 @@ async function handleGenerateAiAnswer() {
   )
 }
 
+async function handleGenerateAiAnswer() {
+  await executeAiAnswerGeneration(
+    currentAiConversations.value,
+    (answer) => {
+      const qid = store.selectedQuestionId!
+      // 保存公共答案文本到 aiAnswers
+      store.saveAiAnswerData(qid, {
+        answer,
+        conversations: store.aiConversations[qid]?.conversations ?? [],
+        updatedAt: Date.now(),
+      })
+    },
+  )
+}
+
 async function handleAiFollowUp(text: string) {
   if (!store.selectedQuestion || !store.selectedQuestionId) return
 
   const qid = store.selectedQuestionId
   const userMsg: ChatMessage = { role: 'user', content: text }
 
-  isGeneratingAiAnswer.value = true
-  aiAnswerError.value = ''
-  aiAnswerStreamingText.value = ''
-  aiAnswerAbortController = new AbortController()
-
   // 追问用户消息先入私有 conversations 队列
   store.addConversationMessage(qid, userMsg)
   const convSnapshot = store.aiConversations[qid]?.conversations ?? []
 
-  await generateTechInterviewAnswer(
-    {
-      question: toQuestionInput(store.selectedQuestion),
-      conversation: convSnapshot,
-    },
-    {
-      onChunk(text) {
-        aiAnswerStreamingText.value = text
-      },
-      onDone(answer) {
-        const aiMsg: ChatMessage = { role: 'assistant', content: answer }
-        store.addConversationMessage(qid, aiMsg)
-        // 同步公共答案文本（与追问无关，但保持一致）
-        store.saveAiAnswerData(qid, {
-          answer,
-          conversations: store.aiConversations[qid]?.conversations ?? [],
-          updatedAt: Date.now(),
-        })
-        isGeneratingAiAnswer.value = false
-        aiAnswerAbortController = null
-      },
-      onError(error) {
-        aiAnswerError.value = error
-        isGeneratingAiAnswer.value = false
-        aiAnswerAbortController = null
-      },
-    },
-    aiAnswerAbortController.signal,
-  )
+  await executeAiAnswerGeneration(convSnapshot, (answer) => {
+    const aiMsg: ChatMessage = { role: 'assistant', content: answer }
+    store.addConversationMessage(qid, aiMsg)
+    // 同步公共答案文本（与追问无关，但保持一致）
+    store.saveAiAnswerData(qid, {
+      answer,
+      conversations: store.aiConversations[qid]?.conversations ?? [],
+      updatedAt: Date.now(),
+    })
+  })
 }
 
 function handleRegenerateAiAnswer() {
@@ -259,7 +258,7 @@ function handleEditAnswer(text: string) {
             class="mastery-btn"
             :class="[getMasteryClass(m), { active: currentMastery() === m }]"
             type="button"
-            @click="store.setPracticeMastery(store.selectedQuestionId!, m)"
+            @click="handleSetMastery(m)"
           >
             {{ getMasteryLabel(m) }}
           </button>

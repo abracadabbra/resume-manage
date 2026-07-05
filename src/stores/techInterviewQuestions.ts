@@ -55,10 +55,13 @@ export interface PracticeRecord {
 
 export type SortBy = 'frequency' | 'default'
 
+export type WeakViewFilter = 'all' | 'marked' | 'recommended'
+
 const TECH_INTERVIEW_PRACTICE_KEY = 'tech-interview-practice-records'
 
 const TECH_INTERVIEW_AI_ANSWERS_KEY = 'tech-interview-ai-answers'
 const TECH_INTERVIEW_AI_CONVERSATIONS_KEY = 'tech-interview-ai-conversations'
+const TECH_INTERVIEW_IGNORED_WEAK_KEY = 'tech-interview-ignored-weak-recommendations'
 const TECH_INTERVIEW_SCHEMA_VERSION = 2
 
 /** v3：AI 公共答案（仅 answer + updatedAt） */
@@ -128,6 +131,16 @@ function normalizeConversationsMap(input: unknown): Record<string, AiConversatio
   )
 }
 
+function loadIgnoredWeakRecommendations(): Set<string> {
+  const value = loadJson<string[]>(localStorage, TECH_INTERVIEW_IGNORED_WEAK_KEY, []).value
+  if (!Array.isArray(value)) return new Set()
+  return new Set(value.filter((id) => typeof id === 'string'))
+}
+
+function saveIgnoredWeakRecommendations(ids: Set<string>) {
+  saveJson(localStorage, TECH_INTERVIEW_IGNORED_WEAK_KEY, Array.from(ids))
+}
+
 function loadPracticeRecords(): Record<string, PracticeRecord> {
   const value = loadJson<Record<string, PracticeRecord>>(localStorage, TECH_INTERVIEW_PRACTICE_KEY, {}).value
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {}
@@ -166,6 +179,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
   const selectedCompanies = ref<string[]>([])
   const searchQuery = ref('')
   const sortBy = ref<SortBy>('frequency')
+  const weakViewFilter = ref<WeakViewFilter>('all')
 
   /** 虚拟分类标识：薄弱题库 */
   const WEAK_CATEGORY_ID = '__weak__'
@@ -190,27 +204,41 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
   const aiConversations = ref<Record<string, AiConversations>>(loadAiConversations())
   const practiceRecords = ref<Record<string, PracticeRecord>>(loadPracticeRecords())
+  const ignoredWeakRecommendations = ref<Set<string>>(loadIgnoredWeakRecommendations())
 
   const allQuestions = computed<TechInterviewQuestion[]>(() => {
     return Object.values(questionsByCategory.value).flat()
   })
 
-  /** 薄弱题库：高频 + 未熟练/薄弱（按 mention_count 倒序） */
+  /** 薄弱题库：用户主动标记为薄弱 或 高频未练（按 mention_count 倒序） */
   const weakQuestions = computed<TechInterviewQuestion[]>(() => {
+    const ignored = ignoredWeakRecommendations.value
     const filtered = allQuestions.value.filter((q) => {
-      if (q.f < 3) return false
+      if (ignored.has(q.id)) return false
       const mastery = practiceRecords.value[q.id]?.mastery ?? 'unpracticed'
-      return mastery === 'unpracticed' || mastery === 'weak'
+      if (mastery === 'weak') return true
+      return q.f >= 3 && mastery === 'unpracticed'
     })
     // spread+sort 兼容当前 TS lib 配置，V8 in-place stable sort 开销可控
     return [...filtered].sort((a, b) => b.f - a.f)
   })
+
+  function getWeakReason(questionId: string): 'marked' | 'recommended' | null {
+    const mastery = practiceRecords.value[questionId]?.mastery ?? 'unpracticed'
+    if (mastery === 'weak') return 'marked'
+    const q = allQuestions.value.find((item) => item.id === questionId)
+    if (q && q.f >= 3 && mastery === 'unpracticed') return 'recommended'
+    return null
+  }
 
   const filteredQuestions = computed<TechInterviewQuestion[]>(() => {
     let result: TechInterviewQuestion[]
 
     if (activeCategoryId.value === WEAK_CATEGORY_ID) {
       result = weakQuestions.value
+      if (weakViewFilter.value !== 'all') {
+        result = result.filter((q) => getWeakReason(q.id) === weakViewFilter.value)
+      }
     } else if (activeCategoryId.value) {
       result = questionsByCategory.value[activeCategoryId.value] ?? []
     } else {
@@ -393,9 +421,12 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
   let practiceSaveTimer: ReturnType<typeof setTimeout> | null = null
 
-  /** 切分类别时清空已加载标记，避免内存泄漏 */
-  watch(activeCategoryId, () => {
+  /** 切分类别时清空已加载标记，避免内存泄漏；离开薄弱题库时重置视图筛选 */
+  watch(activeCategoryId, (id, prevId) => {
     aiAnswersLoaded.value = new Set()
+    if (prevId === WEAK_CATEGORY_ID && id !== WEAK_CATEGORY_ID) {
+      weakViewFilter.value = 'all'
+    }
   })
   watch(
     practiceRecords,
@@ -415,6 +446,18 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
       if (aiConversationsSaveTimer) clearTimeout(aiConversationsSaveTimer)
       aiConversationsSaveTimer = setTimeout(() => {
         saveAiConversations(aiConversations.value)
+      }, 500)
+    },
+    { deep: true },
+  )
+
+  let ignoredWeakSaveTimer: ReturnType<typeof setTimeout> | null = null
+  watch(
+    ignoredWeakRecommendations,
+    () => {
+      if (ignoredWeakSaveTimer) clearTimeout(ignoredWeakSaveTimer)
+      ignoredWeakSaveTimer = setTimeout(() => {
+        saveIgnoredWeakRecommendations(ignoredWeakRecommendations.value)
       }, 500)
     },
     { deep: true },
@@ -522,6 +565,18 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     cloud.schedulePush(questionId, 'practice')
   }
 
+  function ignoreWeakRecommendation(questionId: string) {
+    const next = new Set(ignoredWeakRecommendations.value)
+    next.add(questionId)
+    ignoredWeakRecommendations.value = next
+  }
+
+  function restoreWeakRecommendation(questionId: string) {
+    const next = new Set(ignoredWeakRecommendations.value)
+    next.delete(questionId)
+    ignoredWeakRecommendations.value = next
+  }
+
   function getConversations(questionId: string): AiConversations | null {
     return aiConversations.value[questionId] ?? null
   }
@@ -590,6 +645,10 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
 
   function setSortBy(sort: SortBy) {
     sortBy.value = sort
+  }
+
+  function setWeakViewFilter(filter: WeakViewFilter) {
+    weakViewFilter.value = filter
   }
 
   function selectQuestion(question: TechInterviewQuestion) {
@@ -691,12 +750,14 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     selectedCompanies,
     searchQuery,
     sortBy,
+    weakViewFilter,
     searchQueryDebounced,
     selectedQuestionId,
     selectedQuestion,
     aiAnswers,
     aiConversations,
     practiceRecords,
+    ignoredWeakRecommendations,
     allQuestions,
     filteredQuestions,
     filteredIdList,
@@ -709,6 +770,7 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     setSelectedCompanies,
     setSearchQuery,
     setSortBy,
+    setWeakViewFilter,
     selectQuestion,
     clearFilters,
     selectNextQuestion,
@@ -724,6 +786,8 @@ export const useTechInterviewQuestionsStore = defineStore('techInterviewQuestion
     setPracticeMastery,
     setPracticeAnswer,
     setPracticeNotes,
+    ignoreWeakRecommendation,
+    restoreWeakRecommendation,
     // 云同步
     setCurrentUserId,
     cloudSyncStatus: cloud.status,

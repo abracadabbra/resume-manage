@@ -89,6 +89,31 @@ function isCompanySelected(company: string): boolean {
         </div>
       </div>
 
+      <!-- 薄弱题库视图筛选 -->
+      <div v-if="store.activeCategoryId === '__weak__'" class="weak-filter">
+        <button
+          class="chip"
+          :class="{ active: store.weakViewFilter === 'all' }"
+          @click="store.setWeakViewFilter('all')"
+        >
+          全部
+        </button>
+        <button
+          class="chip"
+          :class="{ active: store.weakViewFilter === 'marked' }"
+          @click="store.setWeakViewFilter('marked')"
+        >
+          我标记的
+        </button>
+        <button
+          class="chip"
+          :class="{ active: store.weakViewFilter === 'recommended' }"
+          @click="store.setWeakViewFilter('recommended')"
+        >
+          系统推荐
+        </button>
+      </div>
+
       <!-- 排序 + 统计 -->
       <div class="list-toolbar">
         <span class="result-count">
@@ -170,6 +195,12 @@ function isCompanySelected(company: string): boolean {
 
 .company-filter {
   overflow: hidden;
+}
+
+.weak-filter {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 .company-chips {

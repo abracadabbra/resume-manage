@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, inject } from 'vue'
 import { useTechInterviewQuestionsStore, type TechInterviewQuestion } from '@/stores/techInterviewQuestions'
 
 const props = defineProps<{
@@ -10,6 +10,7 @@ const props = defineProps<{
 }>()
 
 const store = useTechInterviewQuestionsStore()
+const showToast = inject<(message: string) => void>('techInterviewToast', () => {})
 
 const MASTERY_OPTIONS = ['unpracticed', 'practicing', 'mastered', 'weak'] as const
 const MASTERY_LABELS: Record<string, string> = {
@@ -32,6 +33,15 @@ function getFreqClass(f: number): string {
 }
 
 const practice = computed(() => store.getPracticeRecord(props.question.id))
+
+const isInWeakContext = computed(() => store.activeCategoryId === '__weak__')
+
+const weakReason = computed<'marked' | 'recommended' | null>(() => {
+  const mastery = practice.value.mastery
+  if (mastery === 'weak') return 'marked'
+  if (props.question.f >= 3 && mastery === 'unpracticed') return 'recommended'
+  return null
+})
 
 function getMasteryClass(): string {
   return MASTERY_CLASSES[practice.value.mastery] ?? 'mst-unpracticed'
@@ -56,6 +66,17 @@ function pickMastery(e: Event, m: typeof MASTERY_OPTIONS[number]) {
   e.stopPropagation()
   store.setPracticeMastery(props.question.id, m)
   localMenuOpen.value = false
+  if (m === 'weak') {
+    showToast('已加入薄弱题库')
+  } else if (m === 'mastered') {
+    showToast('已标记为熟练')
+  }
+}
+
+function handleIgnoreWeak(e: Event) {
+  e.stopPropagation()
+  store.ignoreWeakRecommendation(props.question.id)
+  showToast('已移出薄弱题库')
 }
 
 /** HTML 实体转义，防止 highlight 来源不可信（虽实际来自 searchQuery，但渲染走 v-html） */
@@ -100,6 +121,18 @@ const highlightedQuestionHtml = computed(() => buildHighlightedHtml(props.questi
         {{ company }}
       </span>
       <span v-if="question.c.length > 3" class="mini-tag mini-more">+{{ question.c.length - 3 }}</span>
+      <span v-if="isInWeakContext && weakReason" class="weak-reason-tag" :class="`reason-${weakReason}`">
+        {{ weakReason === 'marked' ? '已标记薄弱' : '高频推荐' }}
+      </span>
+      <button
+        v-if="isInWeakContext && weakReason === 'recommended'"
+        class="ignore-weak-btn"
+        type="button"
+        title="移出薄弱题库"
+        @click.stop="handleIgnoreWeak"
+      >
+        ×
+      </button>
       <span class="mastery-chip-wrap">
         <button
           class="mastery-chip"
@@ -229,6 +262,47 @@ const highlightedQuestionHtml = computed(() => buildHighlightedHtml(props.questi
 .mst-practicing { background: #eef4ff; color: #48699d; }
 .mst-mastered { background: #f2f7f1; color: #43764d; }
 .mst-weak { background: #fde8e8; color: #c62828; }
+
+.weak-reason-tag {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.weak-reason-tag.reason-marked {
+  background: #fde8e8;
+  color: #c62828;
+}
+
+.weak-reason-tag.reason-recommended {
+  background: #fff4e5;
+  color: #d97745;
+}
+
+.ignore-weak-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin-left: 2px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: #9b8a7c;
+  font-size: 14px;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.ignore-weak-btn:hover {
+  background: #f4f1ed;
+  color: #c62828;
+}
 
 .mastery-menu {
   position: absolute;
