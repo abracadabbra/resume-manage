@@ -238,8 +238,9 @@ export function usePdfExport(options: UsePdfExportOptions) {
           ctx.fillRect(0, 0, leftBarWidth, leftBarHeight)
         }
 
-        const usePngImage = isHdMode || isSoftwareEngineerTemplate
-        const imgData = usePngImage ? pageCanvas.toDataURL('image/png') : pageCanvas.toDataURL('image/jpeg', 0.92)
+        const usePngImage = isHdMode
+        const jpegQuality = isHdMode ? 0.92 : 0.88
+        const imgData = usePngImage ? pageCanvas.toDataURL('image/png') : pageCanvas.toDataURL('image/jpeg', jpegQuality)
 
         if (pageIndex > 0) pdf.addPage('a4', 'portrait')
         pdf.addImage(
